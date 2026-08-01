@@ -1,6 +1,6 @@
 {
-  "name": "klipper-probe-progress",
-  "version": "0.1.0",
+  "name": "klippertools-suite",
+  "version": "0.2.0",
   "released": "2026-08-01",
   "repository": "https://github.com/Nickfc/Klippertools-progress",
   "klipper_tested": [
@@ -11,6 +11,14 @@
     "v2.17.0",
     "v2.18.2"
   ],
+  "components": [
+    "probe-progress",
+    "nozzle-guard",
+    "start-flow",
+    "maintenance-tracker",
+    "motion-wizard"
+  ],
   "default_eta_seed_points": 3,
-  "supported_probe_method": "automatic"
+  "supported_probe_method": "automatic",
+  "nozzle_guard_default_mode": "block"
 }

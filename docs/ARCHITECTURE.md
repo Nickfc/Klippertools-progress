@@ -1,53 +1,114 @@
 # Architecture
 
-## Data flow
+## Suite boundary
 
-1. The Klipper extra loads as the object probe_progress.
-2. After Klipper is ready, it observes Bed Mesh's ProbeManager start call.
-3. Bed Mesh has already generated the command's real base points, physical
-   probe path, counts, bounds, and faulty-region substitutions.
-4. The extra records every physical touch from probe:update_results.
-5. A logical cell becomes complete only after Klipper's configured sample
-   count passes tolerance for every physical substitute belonging to it.
-6. Klipper exposes the resulting status through its normal object-status API.
-7. Mainsail already subscribes to Klipper objects, so no custom Moonraker
-   component or polling endpoint is required.
+Klippertools uses four small Klipper extras, Mainsail's existing maintenance
+store, and one shared native Mainsail panel. No Moonraker component or custom
+network endpoint is required.
 
-## Matrix model
+| Tool | Runtime source | Status object |
+| --- | --- | --- |
+| Probe Progress | `probe_progress.py` | `probe_progress` |
+| Nozzle Guard | `nozzle_guard.py` | `nozzle_guard` |
+| StartFlow | `start_flow.py` | `start_flow` |
+| Maintenance | Mainsail/Moonraker database | `gui/maintenance` |
+| Motion Wizard | `motion_wizard.py` | `motion_wizard` |
 
-Cells are laid out with increasing X from left to right and decreasing Y from
-top to bottom, which gives the dashboard a physical top-down bed orientation.
-Klipper's serpentine execution order changes cell numbers and activation order
-without changing that physical layout.
+Mainsail already subscribes to every available Klipper status object. The
+Klippertools UI therefore receives real-time state through the normal
+`printer.objects.subscribe` connection.
 
-The public state for each cell is pending, active, or done. Probe samples and
-tolerance retry sets are internal to the active cell. A faulty logical point
-can expand into several physical positions; it turns green only after all of
-those positions complete.
+## UI Core
 
-## ETA model
+Probe Progress remains a dedicated matrix card. The other tools share
+`KlippertoolsPanel.vue`, which supplies responsive tabs, a common location under
+Console, and an attention count. A confirmed blocking nozzle mismatch and each
+overdue maintenance entry contribute to that count.
 
-The timer for a logical point begins when it becomes active and ends when it
-turns green. This includes travel from the preceding point, all configured
-samples, sample retracts, and any tolerance retries incurred during the seed
-point.
+Dashboard injection is version matched. Existing saved dashboard layouts gain
+Probe Progress and Klippertools immediately after Console without moving other
+saved panels. Both cards remain available in Mainsail's dashboard editor.
 
-After the first three logical points complete, the backend calculates:
+## Probe Progress
 
-    seconds_per_point = duration(first three points) / 3
-    deadline = current_time + seconds_per_point * remaining_points
+After Klipper is ready, the extra observes Bed Mesh's `ProbeManager.start_probe`
+call. Bed Mesh has already produced the command's real logical points, physical
+probe path, counts, bounds, faulty-region substitutes, and optional zero
+reference. `probe:update_results` advances sample and retry state.
 
-The deadline is intentionally fixed after those first three points, matching
-the requested behavior. The displayed remaining time counts down from it.
-Meshes with fewer than three logical points use every available point.
+A logical cell becomes complete only when every physical substitute completes
+its accepted sample set. The first three logical point durations seed a fixed
+deadline:
 
-## Integration boundary
+```text
+seconds_per_point = duration(first three points) / 3
+deadline = seed_completion_time + seconds_per_point * remaining_points
+```
 
-The backend hooks a Klipper Bed Mesh internal method because Klipper does not
-currently expose a dedicated public bed-mesh progress event. The exact
-integration has been checked against the two listed Klipper revisions. The
-Mainsail side is also a native patch because Mainsail v2 has no external
-dashboard-card API.
+## Nozzle Guard
 
-The installer makes both integration boundaries explicit: it uses a
-version-matched Mainsail build and retains a full rollback copy.
+At `klippy:ready`, Nozzle Guard wraps the configured virtual SD object's private
+file-load and resume methods. Load inspects at most the configured number of
+bytes at both the beginning and end of the G-code. Resume is the enforcement
+boundary: a confirmed mismatch in `block` mode raises a command error before
+virtual SD work starts.
+
+Missing metadata is not proof of a mismatch and therefore remains non-blocking.
+An override changes state only for the currently selected file; loading another
+file performs a new check.
+
+## StartFlow
+
+StartFlow is an explicit stage state machine. `START_FLOW_BEGIN` creates the
+planned stages, each `START_FLOW_STAGE` closes the previous stage and starts the
+next, and `START_FLOW_COMPLETE` closes the run. Command errors, cancellation,
+and Klipper shutdown mark an active stage as failed.
+
+The installer edits `PRINT_START` only when it finds one unambiguous M140/M190
+start, G28, BED_MESH_CALIBRATE, M109, and final completion response. Every
+inserted command has a paired marker. Removal refuses a marker whose paired
+command was modified, preventing accidental deletion of user macro content.
+
+Stage estimates use configurable seeds and an in-memory exponential update:
+
+```text
+new_estimate = old_estimate * (1 - learning_rate)
+             + measured_duration * learning_rate
+```
+
+## Maintenance Tracker
+
+Mainsail already stores maintenance entries in Moonraker's `maintenance`
+namespace and relates them to Moonraker history totals. Klippertools reads the
+same entries and opens Mainsail's existing add, edit, detail, and perform
+dialogs. No data migration or parallel persistence exists.
+
+For a task with multiple enabled thresholds, the dashboard shows the threshold
+with the highest completion ratio. Any reached threshold makes the task due.
+
+## Motion Wizard
+
+Motion Wizard validates that the printer is idle and that XYZ are homed before
+calibration. It invokes Klipper's own synchronous `MEASURE_AXES_NOISE` and
+`SHAPER_CALIBRATE AXIS=...` handlers. After calibration it reads the applied
+`InputShaperParams` directly and exposes the review data.
+
+Klipper's calibration command stages configfile changes internally. The wizard
+does not call `SAVE_CONFIG`; Mainsail exposes that separately behind a
+confirmation dialog after both X and Y have new results.
+
+## Installation model
+
+The installer copies the four extras, one configuration include, a
+version-matched Mainsail build, and optional StartFlow markers. Before mutation
+it saves `printer.cfg`, every pre-existing managed file, and the complete
+Mainsail tree. A trap restores originals after any failed operation.
+
+Uninstall uses the recorded paths and existence flags, validates every path
+under the normal user's home, reverses only recorded changes, preserves the
+latest Mainsail `config.json`, and retains recovery material.
+
+The Probe Progress and Nozzle Guard hooks use Klipper private methods because
+Klipper currently exposes neither a public bed-mesh progress event nor a public
+pre-resume validation hook. Both boundaries are validated against the two
+listed Klipper revisions.

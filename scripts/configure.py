@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Safely add or remove the Probe Progress include in printer.cfg."""
+"""Safely add or remove the Klippertools include in printer.cfg."""
 
 import argparse
 import os
@@ -7,8 +7,8 @@ from pathlib import Path
 import tempfile
 
 
-INCLUDE_LINE = "[include probe_progress.cfg]"
-COMMENT_LINE = "# Added by Klipper Probe Progress"
+INCLUDE_LINE = "[include klippertools.cfg]"
+COMMENT_LINE = "# Added by Klippertools Suite"
 
 
 def add_include(text):

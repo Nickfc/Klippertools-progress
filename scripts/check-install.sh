@@ -7,6 +7,7 @@ CONFIG_DIR="${CONFIG_DIR:-$PRINTER_DATA_DIR/config}"
 MAINSAIL_DIR="${MAINSAIL_DIR:-$HOME/mainsail}"
 PRINTER_CFG="$CONFIG_DIR/printer.cfg"
 STATUS=0
+EXTRA_NAMES=(probe_progress nozzle_guard start_flow motion_wizard)
 
 check() {
     local label=$1
@@ -19,15 +20,14 @@ check() {
     fi
 }
 
-check "Klipper backend" \
-    test -f "$KLIPPER_DIR/klippy/extras/probe_progress.py"
-check "plugin configuration" \
-    test -f "$CONFIG_DIR/probe_progress.cfg"
+for name in "${EXTRA_NAMES[@]}"; do
+    check "Klipper backend: $name" \
+        test -f "$KLIPPER_DIR/klippy/extras/$name.py"
+done
+check "suite configuration" test -f "$CONFIG_DIR/klippertools.cfg"
 check "printer.cfg include" \
-    grep -Eq '^[[:space:]]*\[include probe_progress\.cfg\]' "$PRINTER_CFG"
-check "Mainsail card build" \
-    test -f "$MAINSAIL_DIR/probe-progress-build.txt"
-check "install state" \
-    test -f "$PRINTER_DATA_DIR/probe-progress-install-state"
+    grep -Eq '^[[:space:]]*\[include klippertools\.cfg\]' "$PRINTER_CFG"
+check "Mainsail suite build" test -f "$MAINSAIL_DIR/klippertools-build.txt"
+check "install state" test -f "$PRINTER_DATA_DIR/klippertools-install-state"
 
 exit "$STATUS"

@@ -23,8 +23,8 @@ class ConfigureTest(unittest.TestCase):
         self.assertIn(
             "[include mainsail.cfg]\n"
             "\n"
-            "# Added by Klipper Probe Progress\n"
-            "[include probe_progress.cfg]\n"
+            "# Added by Klippertools Suite\n"
+            "[include klippertools.cfg]\n"
             "\n"
             "[mcu]",
             updated,
@@ -33,7 +33,7 @@ class ConfigureTest(unittest.TestCase):
     def test_add_is_idempotent(self):
         original = (
             "[include mainsail.cfg]\n"
-            "[include probe_progress.cfg]\n"
+            "[include klippertools.cfg]\n"
         )
         updated, changed = MODULE.add_include(original)
         self.assertFalse(changed)
@@ -50,7 +50,7 @@ class ConfigureTest(unittest.TestCase):
         updated, changed = MODULE.add_include(original)
         self.assertTrue(changed)
         self.assertLess(
-            updated.index("[include probe_progress.cfg]"),
+            updated.index("[include klippertools.cfg]"),
             updated.index("SAVE_CONFIG"),
         )
 
@@ -58,15 +58,15 @@ class ConfigureTest(unittest.TestCase):
         original = (
             "[include mainsail.cfg]\n"
             "\n"
-            "# Added by Klipper Probe Progress\n"
-            "[include probe_progress.cfg]\n"
+            "# Added by Klippertools Suite\n"
+            "[include klippertools.cfg]\n"
             "\n"
             "[mcu]\n"
             "serial: /dev/example\n"
         )
         updated, changed = MODULE.remove_include(original)
         self.assertTrue(changed)
-        self.assertNotIn("probe_progress", updated)
+        self.assertNotIn("klippertools.cfg", updated)
         self.assertIn("[include mainsail.cfg]", updated)
         self.assertIn("serial: /dev/example", updated)
 

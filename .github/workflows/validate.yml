@@ -19,11 +19,7 @@ jobs:
 
       - name: Check Python syntax
         run: |
-          python3 -m py_compile \
-            klipper/probe_progress.py \
-            scripts/configure.py \
-            tests/test_probe_progress.py \
-            tests/test_configure.py
+          python3 -m py_compile klipper/*.py scripts/*.py tests/*.py
 
       - name: Check shell syntax
         run: |
@@ -31,12 +27,18 @@ jobs:
             install-online.sh \
             scripts/install.sh \
             scripts/uninstall.sh \
-            scripts/check-install.sh
+            scripts/check-install.sh \
+            tests/test_transactional_install.sh
+
+      - name: Test transactional install and uninstall
+        run: tests/test_transactional_install.sh
 
       - name: Verify release files
         run: |
           sha256sum -c SHA256SUMS
-          unzip -tq dist/mainsail-v2.17.0-probe-progress.zip
-          unzip -tq dist/mainsail-v2.18.2-probe-progress.zip
-          unzip -tq source/mainsail-v2.17.0-probe-progress-source.zip
-          unzip -tq source/mainsail-v2.18.2-probe-progress-source.zip
+          unzip -tq dist/mainsail-v2.17.0-klippertools.zip
+          unzip -tq dist/mainsail-v2.18.2-klippertools.zip
+          unzip -tq source/mainsail-v2.17.0-klippertools-source.zip
+          unzip -tq source/mainsail-v2.18.2-klippertools-source.zip
+          unzip -tq dist/klippertools-suite-0.2.0.zip
+          (cd dist && sha256sum -c klippertools-suite-0.2.0.zip.sha256)
