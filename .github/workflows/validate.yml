@@ -1,0 +1,55 @@
+name: Validate
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Run Python tests
+        run: python3 -m unittest discover -s tests -v
+
+      - name: Check Python syntax
+        run: |
+          python3 -m py_compile klipper/*.py moonraker/*.py scripts/*.py tests/*.py
+
+      - name: Check shell syntax
+        run: |
+          bash -n \
+            install-online.sh \
+            scripts/install.sh \
+            scripts/uninstall.sh \
+            scripts/check-install.sh \
+            scripts/recover.sh \
+            scripts/update.sh \
+            scripts/update-online.sh \
+            tests/test_transactional_install.sh \
+            tests/test_lifecycle_safety.sh \
+            tests/test_online_lifecycle.sh
+
+      - name: Test transactional install and uninstall
+        run: tests/test_transactional_install.sh
+
+      - name: Test integrity, update, and power-loss recovery
+        run: tests/test_lifecycle_safety.sh
+
+      - name: Test online install, update, uninstall, and reinstall
+        run: tests/test_online_lifecycle.sh
+
+      - name: Verify release files
+        run: |
+          sha256sum -c SHA256SUMS
+          unzip -tq dist/mainsail-v2.17.0-klippertools.zip
+          unzip -tq dist/mainsail-v2.18.2-klippertools.zip
+          unzip -tq source/mainsail-v2.17.0-klippertools-source.zip
+          unzip -tq source/mainsail-v2.18.2-klippertools-source.zip
+          unzip -tq dist/klippertools-suite-0.2.1.zip
+          (cd dist && sha256sum -c klippertools-suite-0.2.1.zip.sha256)

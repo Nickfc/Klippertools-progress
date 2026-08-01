@@ -1,0 +1,2395 @@
+diff --git a/src/components/klippertools/MaintenanceTrackerTool.vue b/src/components/klippertools/MaintenanceTrackerTool.vue
+new file mode 100644
+index 0000000..8029e86
+--- /dev/null
++++ b/src/components/klippertools/MaintenanceTrackerTool.vue
+@@ -0,0 +1,176 @@
++<template>
++    <div class="pa-4">
++        <div class="d-flex justify-end mb-2">
++            <v-btn small text color="primary" @click="showAddDialog = true">
++                <v-icon small left>{{ mdiPlus }}</v-icon>
++                {{ $t('Panels.KlippertoolsPanel.Maintenance.AddTask') }}
++            </v-btn>
++        </div>
++
++        <v-list v-if="activeEntries.length" dense class="transparent pa-0">
++            <v-list-item
++                v-for="entry in activeEntries"
++                :key="entry.id"
++                class="maintenance-entry px-3"
++                :class="{ 'maintenance-entry--due': entryProgress(entry) >= 100 }"
++                @click="openDetails(entry)">
++                <v-list-item-content>
++                    <div class="d-flex justify-space-between mb-1">
++                        <v-list-item-title>{{ entry.name }}</v-list-item-title>
++                        <span :class="entryStatusClass(entry)" class="text-caption">{{ entryStatus(entry) }}</span>
++                    </div>
++                    <v-progress-linear
++                        :value="entryProgress(entry)"
++                        :color="entryProgress(entry) >= 100 ? 'error' : 'primary'"
++                        height="7"
++                        rounded />
++                    <div class="text-caption text--secondary mt-1">{{ entryMetric(entry) }}</div>
++                </v-list-item-content>
++                <v-list-item-icon class="ml-3 mr-0">
++                    <v-icon small>{{ mdiChevronRight }}</v-icon>
++                </v-list-item-icon>
++            </v-list-item>
++        </v-list>
++
++        <v-alert v-else dense text type="info" class="mb-0">
++            {{ $t('Panels.KlippertoolsPanel.Maintenance.Empty') }}
++        </v-alert>
++
++        <history-list-panel-add-maintenance v-model="showAddDialog" />
++        <history-list-panel-detail-maintenance v-if="selectedEntry" v-model="showDetailDialog" :item="selectedEntry" />
++    </div>
++</template>
++
++<script lang="ts">
++import { Component, Mixins } from 'vue-property-decorator'
++import BaseMixin from '@/components/mixins/base'
++import HistoryListPanelAddMaintenance from '@/components/dialogs/HistoryListPanelAddMaintenance.vue'
++import HistoryListPanelDetailMaintenance from '@/components/dialogs/HistoryListPanelDetailMaintenance.vue'
++import { GuiMaintenanceStateEntry } from '@/store/gui/maintenance/types'
++import { mdiChevronRight, mdiPlus } from '@mdi/js'
++
++interface MaintenanceMetric {
++    progress: number
++    text: string
++}
++
++@Component({
++    components: {
++        HistoryListPanelAddMaintenance,
++        HistoryListPanelDetailMaintenance,
++    },
++})
++export default class MaintenanceTrackerTool extends Mixins(BaseMixin) {
++    mdiChevronRight = mdiChevronRight
++    mdiPlus = mdiPlus
++
++    showAddDialog = false
++    showDetailDialog = false
++    selectedEntry: GuiMaintenanceStateEntry | null = null
++
++    get entries(): GuiMaintenanceStateEntry[] {
++        return this.$store.getters['gui/maintenance/getEntries'] ?? []
++    }
++
++    get activeEntries(): GuiMaintenanceStateEntry[] {
++        return this.entries
++            .filter((entry) => entry.end_time === null && entry.reminder?.type !== null)
++            .sort((left, right) => this.entryProgress(right) - this.entryProgress(left))
++    }
++
++    get totalPrintTime(): number {
++        return this.$store.state.server.history.job_totals?.total_print_time ?? 0
++    }
++
++    get totalFilament(): number {
++        return this.$store.state.server.history.job_totals?.total_filament_used ?? 0
++    }
++
++    metrics(entry: GuiMaintenanceStateEntry): MaintenanceMetric[] {
++        const metrics: MaintenanceMetric[] = []
++        if (entry.reminder.printtime.bool && entry.reminder.printtime.value) {
++            const used = Math.max(0, (this.totalPrintTime - entry.start_printtime) / 3600)
++            const target = entry.reminder.printtime.value
++            metrics.push({
++                progress: (used / target) * 100,
++                text: `${used.toFixed(1)} / ${target} h`,
++            })
++        }
++        if (entry.reminder.filament.bool && entry.reminder.filament.value) {
++            const used = Math.max(0, (this.totalFilament - entry.start_filament) / 1000)
++            const target = entry.reminder.filament.value
++            metrics.push({
++                progress: (used / target) * 100,
++                text: `${used.toFixed(0)} / ${target} m`,
++            })
++        }
++        if (entry.reminder.date.bool && entry.reminder.date.value) {
++            const used = Math.max(0, Date.now() / 1000 - entry.start_time) / 86400
++            const target = entry.reminder.date.value
++            metrics.push({
++                progress: (used / target) * 100,
++                text: String(
++                    this.$t('Panels.KlippertoolsPanel.Maintenance.DaysProgress', {
++                        current: used.toFixed(0),
++                        total: target,
++                    })
++                ),
++            })
++        }
++        return metrics
++    }
++
++    primaryMetric(entry: GuiMaintenanceStateEntry): MaintenanceMetric | null {
++        const metrics = this.metrics(entry)
++        if (!metrics.length) return null
++        return metrics.reduce((highest, metric) => (metric.progress > highest.progress ? metric : highest))
++    }
++
++    entryProgress(entry: GuiMaintenanceStateEntry): number {
++        return Math.min(100, Math.max(0, this.primaryMetric(entry)?.progress ?? 0))
++    }
++
++    entryMetric(entry: GuiMaintenanceStateEntry): string {
++        return this.primaryMetric(entry)?.text ?? ''
++    }
++
++    entryStatus(entry: GuiMaintenanceStateEntry): string {
++        const key = this.entryProgress(entry) >= 100 ? 'Due' : 'Tracking'
++        return String(this.$t(`Panels.KlippertoolsPanel.Maintenance.${key}`))
++    }
++
++    entryStatusClass(entry: GuiMaintenanceStateEntry): string {
++        return this.entryProgress(entry) >= 100 ? 'error--text font-weight-bold' : 'text--secondary'
++    }
++
++    openDetails(entry: GuiMaintenanceStateEntry): void {
++        this.selectedEntry = entry
++        this.showDetailDialog = true
++    }
++}
++</script>
++
++<style scoped>
++.maintenance-entry {
++    border: 1px solid rgba(127, 127, 127, 0.16);
++    border-radius: 8px;
++    cursor: pointer;
++    margin-bottom: 7px;
++    background: rgba(127, 127, 127, 0.045);
++    transition:
++        background-color 150ms ease,
++        border-color 150ms ease,
++        transform 150ms ease;
++}
++
++.maintenance-entry:hover {
++    border-color: rgba(33, 150, 243, 0.36);
++    background: rgba(33, 150, 243, 0.07);
++    transform: translateY(-1px);
++}
++
++.maintenance-entry--due {
++    border-color: rgba(244, 67, 54, 0.36);
++    background: rgba(244, 67, 54, 0.065);
++}
++</style>
+diff --git a/src/components/klippertools/MotionWizardTool.vue b/src/components/klippertools/MotionWizardTool.vue
+new file mode 100644
+index 0000000..5874776
+--- /dev/null
++++ b/src/components/klippertools/MotionWizardTool.vue
+@@ -0,0 +1,234 @@
++<template>
++    <div class="pa-4">
++        <v-alert dense text type="warning" class="mb-4">
++            {{ $t('Panels.KlippertoolsPanel.Motion.Safety') }}
++        </v-alert>
++
++        <v-progress-linear :value="status ? status.progress : 0" color="primary" height="8" rounded class="mb-4" />
++
++        <div class="motion-step mb-3" :class="{ 'motion-step--done': allHomed }">
++            <div class="motion-step__number">1</div>
++            <div class="motion-step__content">
++                <div class="font-weight-medium">{{ $t('Panels.KlippertoolsPanel.Motion.HomeTitle') }}</div>
++                <div class="text-caption text--secondary">{{ homedText }}</div>
++            </div>
++            <v-btn small text :disabled="actionsDisabled" @click="home">
++                <v-icon small left>{{ mdiHome }}</v-icon>
++                {{ $t('Panels.KlippertoolsPanel.Motion.Home') }}
++            </v-btn>
++        </div>
++
++        <div class="motion-step mb-3" :class="{ 'motion-step--done': status && status.noise_complete }">
++            <div class="motion-step__number">2</div>
++            <div class="motion-step__content">
++                <div class="font-weight-medium">{{ $t('Panels.KlippertoolsPanel.Motion.NoiseTitle') }}</div>
++                <div class="text-caption text--secondary">{{ noiseText }}</div>
++            </div>
++            <v-btn small text :disabled="actionsDisabled" @click="noiseTest">
++                <v-icon small left>{{ mdiWaveform }}</v-icon>
++                {{ $t('Panels.KlippertoolsPanel.Motion.Test') }}
++            </v-btn>
++        </div>
++
++        <div class="motion-step mb-4" :class="{ 'motion-step--done': canSave }">
++            <div class="motion-step__number">3</div>
++            <div class="motion-step__content">
++                <div class="font-weight-medium">{{ $t('Panels.KlippertoolsPanel.Motion.CalibrateTitle') }}</div>
++                <div class="text-caption text--secondary">
++                    {{ $t('Panels.KlippertoolsPanel.Motion.CalibrateHint') }}
++                </div>
++            </div>
++            <div class="d-flex">
++                <v-btn small text :disabled="calibrationDisabled" @click="calibrate('X')">X</v-btn>
++                <v-btn small text :disabled="calibrationDisabled" @click="calibrate('Y')">Y</v-btn>
++            </div>
++        </div>
++
++        <v-row dense class="mb-2">
++            <v-col v-for="axis in ['x', 'y']" :key="axis" cols="6">
++                <v-card outlined class="motion-result-card pa-3" :class="{ 'motion-result-card--ready': result(axis) }">
++                    <div class="text-caption text--secondary">{{ axis.toUpperCase() }}</div>
++                    <template v-if="result(axis)">
++                        <div class="font-weight-medium">{{ result(axis).type }}</div>
++                        <div class="text-caption">{{ result(axis).frequency.toFixed(1) }} Hz</div>
++                        <v-chip v-if="result(axis).calibrated" x-small color="success" outlined class="mt-1">
++                            {{ $t('Panels.KlippertoolsPanel.Motion.NewResult') }}
++                        </v-chip>
++                    </template>
++                    <div v-else class="text--secondary">—</div>
++                </v-card>
++            </v-col>
++        </v-row>
++
++        <v-alert v-if="status && status.error" dense text type="error" class="mt-3 mb-2">
++            {{ status.error }}
++        </v-alert>
++
++        <div class="d-flex justify-space-between mt-3">
++            <v-btn small text :disabled="status && status.active" @click="reset">
++                <v-icon small left>{{ mdiRefresh }}</v-icon>
++                {{ $t('Panels.KlippertoolsPanel.Common.Reset') }}
++            </v-btn>
++            <v-btn small color="primary" :disabled="!canSave" @click="showSave = true">
++                <v-icon small left>{{ mdiContentSaveCheck }}</v-icon>
++                {{ $t('Panels.KlippertoolsPanel.Motion.ReviewSave') }}
++            </v-btn>
++        </div>
++
++        <v-dialog v-model="showSave" max-width="500">
++            <v-card>
++                <v-card-title>{{ $t('Panels.KlippertoolsPanel.Motion.SaveTitle') }}</v-card-title>
++                <v-card-text>{{ $t('Panels.KlippertoolsPanel.Motion.SaveWarning') }}</v-card-text>
++                <v-card-actions>
++                    <v-spacer />
++                    <v-btn text @click="showSave = false">{{ $t('Buttons.Cancel') }}</v-btn>
++                    <v-btn color="primary" text @click="saveConfig">
++                        {{ $t('Panels.KlippertoolsPanel.Motion.SaveRestart') }}
++                    </v-btn>
++                </v-card-actions>
++            </v-card>
++        </v-dialog>
++    </div>
++</template>
++
++<script lang="ts">
++import { Component, Mixins } from 'vue-property-decorator'
++import BaseMixin from '@/components/mixins/base'
++import { mdiContentSaveCheck, mdiHome, mdiRefresh, mdiWaveform } from '@mdi/js'
++import { MotionWizardResult, MotionWizardStatus } from '@/components/klippertools/types'
++
++@Component
++export default class MotionWizardTool extends Mixins(BaseMixin) {
++    mdiContentSaveCheck = mdiContentSaveCheck
++    mdiHome = mdiHome
++    mdiRefresh = mdiRefresh
++    mdiWaveform = mdiWaveform
++
++    showSave = false
++
++    get status(): MotionWizardStatus | null {
++        return this.$store.state.printer?.motion_wizard ?? null
++    }
++
++    get printerBusy(): boolean {
++        return ['printing', 'paused'].includes(this.$store.state.printer?.print_stats?.state ?? '')
++    }
++
++    get allHomed(): boolean {
++        const homed = this.status?.homed_axes ?? ''
++        return ['x', 'y', 'z'].every((axis) => homed.includes(axis))
++    }
++
++    get actionsDisabled(): boolean {
++        return this.printerBusy || Boolean(this.status?.active) || !this.status?.ready
++    }
++
++    get calibrationDisabled(): boolean {
++        return this.actionsDisabled || !this.allHomed
++    }
++
++    get canSave(): boolean {
++        return Boolean(
++            this.status?.pending_save &&
++            this.status.completed_axes.includes('x') &&
++            this.status.completed_axes.includes('y') &&
++            !this.status.active
++        )
++    }
++
++    get homedText(): string {
++        const key = this.allHomed ? 'Homed' : 'NotHomed'
++        return String(this.$t(`Panels.KlippertoolsPanel.Motion.${key}`))
++    }
++
++    get noiseText(): string {
++        const key = this.status?.noise_complete ? 'NoiseComplete' : 'NoiseHint'
++        return String(this.$t(`Panels.KlippertoolsPanel.Motion.${key}`))
++    }
++
++    result(axis: string): MotionWizardResult | null {
++        return this.status?.results?.[axis] ?? null
++    }
++
++    home(): void {
++        this.$socket.emit('printer.gcode.script', { script: 'G28' }, { loading: 'motionWizardHome' })
++    }
++
++    noiseTest(): void {
++        this.$socket.emit('printer.gcode.script', { script: 'MOTION_WIZARD_NOISE' }, { loading: 'motionWizardNoise' })
++    }
++
++    calibrate(axis: 'X' | 'Y'): void {
++        this.$socket.emit(
++            'printer.gcode.script',
++            { script: `MOTION_WIZARD_CALIBRATE AXIS=${axis}` },
++            { loading: `motionWizard${axis}` }
++        )
++    }
++
++    reset(): void {
++        this.$socket.emit('printer.gcode.script', { script: 'MOTION_WIZARD_RESET' }, { loading: 'motionWizardReset' })
++    }
++
++    saveConfig(): void {
++        this.showSave = false
++        this.$socket.emit('printer.gcode.script', { script: 'SAVE_CONFIG' }, { loading: 'topbarSaveConfig' })
++    }
++}
++</script>
++
++<style scoped>
++.motion-step {
++    align-items: center;
++    border: 1px solid rgba(127, 127, 127, 0.16);
++    border-radius: 8px;
++    display: flex;
++    gap: 12px;
++    padding: 9px 10px;
++    background: rgba(127, 127, 127, 0.045);
++    transition:
++        background-color 160ms ease,
++        border-color 160ms ease;
++}
++
++.motion-step--done {
++    border-color: rgba(76, 175, 80, 0.3);
++    background: rgba(76, 175, 80, 0.055);
++}
++
++.motion-step__number {
++    align-items: center;
++    background: rgba(33, 150, 243, 0.16);
++    border-radius: 50%;
++    color: #42a5f5;
++    display: flex;
++    flex: 0 0 28px;
++    font-size: 0.8rem;
++    font-weight: 700;
++    height: 28px;
++    justify-content: center;
++}
++
++.motion-step__content {
++    flex: 1 1 auto;
++    min-width: 0;
++}
++
++.motion-step--done .motion-step__number {
++    background: rgba(76, 175, 80, 0.16);
++    color: #66bb6a;
++}
++
++.motion-result-card {
++    min-height: 92px;
++    background: rgba(127, 127, 127, 0.035) !important;
++    transition:
++        background-color 160ms ease,
++        border-color 160ms ease;
++}
++
++.motion-result-card--ready {
++    border-color: rgba(33, 150, 243, 0.34) !important;
++    background: rgba(33, 150, 243, 0.06) !important;
++}
++</style>
+diff --git a/src/components/klippertools/NozzleGuardTool.vue b/src/components/klippertools/NozzleGuardTool.vue
+new file mode 100644
+index 0000000..b9750aa
+--- /dev/null
++++ b/src/components/klippertools/NozzleGuardTool.vue
+@@ -0,0 +1,206 @@
++<template>
++    <div class="pa-4">
++        <v-alert dense text :type="alertType" class="mb-4">
++            {{ stateText }}
++        </v-alert>
++
++        <div v-if="status" class="klippertools-comparison mb-3">
++            <div class="nozzle-card">
++                <div class="text-caption text--secondary">
++                    {{ $t('Panels.KlippertoolsPanel.NozzleGuard.KlipperNozzle') }}
++                </div>
++                <div class="nozzle-card__value">{{ formatNozzle(status.configured_nozzle) }}</div>
++            </div>
++            <div class="nozzle-comparison-icon" :class="'nozzle-comparison-icon--' + alertType">
++                <v-icon :color="comparisonColor">{{ comparisonIcon }}</v-icon>
++            </div>
++            <div class="nozzle-card text-right" :class="'nozzle-card--' + alertType">
++                <div class="text-caption text--secondary">
++                    {{ $t('Panels.KlippertoolsPanel.NozzleGuard.FileNozzle') }}
++                </div>
++                <div class="nozzle-card__value">{{ detectedNozzleText }}</div>
++            </div>
++        </div>
++
++        <div v-if="status && status.filename" class="nozzle-filename text-caption text--secondary text-truncate mb-3">
++            {{ status.filename }}
++        </div>
++
++        <div class="d-flex flex-wrap justify-end ga-2">
++            <v-btn v-if="canRecheck" small text :disabled="isBusy" @click="recheck">
++                <v-icon small left>{{ mdiRefresh }}</v-icon>
++                {{ $t('Panels.KlippertoolsPanel.NozzleGuard.Recheck') }}
++            </v-btn>
++            <v-btn v-if="canOverride" small color="error" text :disabled="isBusy" @click="showOverride = true">
++                <v-icon small left>{{ mdiShieldOffOutline }}</v-icon>
++                {{ $t('Panels.KlippertoolsPanel.NozzleGuard.Override') }}
++            </v-btn>
++        </div>
++
++        <v-dialog v-model="showOverride" max-width="480">
++            <v-card>
++                <v-card-title>{{ $t('Panels.KlippertoolsPanel.NozzleGuard.OverrideTitle') }}</v-card-title>
++                <v-card-text>
++                    {{ $t('Panels.KlippertoolsPanel.NozzleGuard.OverrideWarning') }}
++                </v-card-text>
++                <v-card-actions>
++                    <v-spacer />
++                    <v-btn text @click="showOverride = false">{{ $t('Buttons.Cancel') }}</v-btn>
++                    <v-btn color="error" text @click="overrideMismatch">
++                        {{ $t('Panels.KlippertoolsPanel.NozzleGuard.OverrideOnce') }}
++                    </v-btn>
++                </v-card-actions>
++            </v-card>
++        </v-dialog>
++    </div>
++</template>
++
++<script lang="ts">
++import { Component, Mixins } from 'vue-property-decorator'
++import BaseMixin from '@/components/mixins/base'
++import { mdiAlertCircle, mdiCheckCircle, mdiHelpCircle, mdiRefresh, mdiShieldOffOutline } from '@mdi/js'
++import { NozzleGuardStatus } from '@/components/klippertools/types'
++
++@Component
++export default class NozzleGuardTool extends Mixins(BaseMixin) {
++    mdiRefresh = mdiRefresh
++    mdiShieldOffOutline = mdiShieldOffOutline
++
++    showOverride = false
++
++    get status(): NozzleGuardStatus | null {
++        return this.$store.state.printer?.nozzle_guard ?? null
++    }
++
++    get isBusy(): boolean {
++        return ['printing', 'paused'].includes(this.$store.state.printer?.print_stats?.state ?? '')
++    }
++
++    get canRecheck(): boolean {
++        return Boolean(this.status?.filename)
++    }
++
++    get canOverride(): boolean {
++        return this.status?.state === 'mismatch' && this.status.blocking
++    }
++
++    get alertType(): 'success' | 'warning' | 'error' | 'info' {
++        if (this.status?.state === 'match') return 'success'
++        if (this.status?.state === 'mismatch') return this.status.blocking ? 'error' : 'warning'
++        if (this.status?.state === 'error') return 'error'
++        if (this.status?.state === 'overridden') return 'warning'
++        return 'info'
++    }
++
++    get comparisonColor(): string {
++        if (this.status?.state === 'match') return 'success'
++        if (this.status?.state === 'mismatch') return 'error'
++        return 'grey'
++    }
++
++    get comparisonIcon(): string {
++        if (this.status?.state === 'match') return mdiCheckCircle
++        if (this.status?.state === 'mismatch') return mdiAlertCircle
++        return mdiHelpCircle
++    }
++
++    get detectedNozzleText(): string {
++        const values = this.status?.detected_nozzles ?? []
++        if (!values.length) return String(this.$t('Panels.KlippertoolsPanel.Common.Unknown'))
++        return values.map((value) => this.formatNozzle(value)).join(', ')
++    }
++
++    get stateText(): string {
++        const state = this.status?.state ?? 'no_file'
++        if (state === 'mismatch') {
++            const key = this.status?.blocking ? 'mismatch_blocked' : 'mismatch_warning'
++            return String(this.$t(`Panels.KlippertoolsPanel.NozzleGuard.States.${key}`))
++        }
++        return String(this.$t(`Panels.KlippertoolsPanel.NozzleGuard.States.${state}`))
++    }
++
++    formatNozzle(value: number): string {
++        return `${value.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')} mm`
++    }
++
++    recheck(): void {
++        this.$socket.emit('printer.gcode.script', { script: 'NOZZLE_GUARD_RECHECK' }, { loading: 'nozzleGuard' })
++    }
++
++    overrideMismatch(): void {
++        this.showOverride = false
++        this.$socket.emit('printer.gcode.script', { script: 'NOZZLE_GUARD_OVERRIDE' }, { loading: 'nozzleGuard' })
++    }
++}
++</script>
++
++<style scoped>
++.klippertools-comparison {
++    align-items: center;
++    display: grid;
++    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
++    gap: 10px;
++}
++
++.nozzle-card {
++    border: 1px solid rgba(127, 127, 127, 0.2);
++    border-radius: 8px;
++    min-width: 0;
++    padding: 11px 12px;
++    background: rgba(127, 127, 127, 0.06);
++}
++
++.nozzle-card--success {
++    border-color: rgba(76, 175, 80, 0.34);
++    background: rgba(76, 175, 80, 0.07);
++}
++
++.nozzle-card--warning {
++    border-color: rgba(255, 193, 7, 0.34);
++    background: rgba(255, 193, 7, 0.07);
++}
++
++.nozzle-card--error {
++    border-color: rgba(244, 67, 54, 0.4);
++    background: rgba(244, 67, 54, 0.08);
++}
++
++.nozzle-card__value {
++    font-size: 1.35rem;
++    font-variant-numeric: tabular-nums;
++    font-weight: 600;
++    line-height: 1.35;
++    margin-top: 2px;
++    white-space: nowrap;
++}
++
++.nozzle-comparison-icon {
++    align-items: center;
++    border: 1px solid rgba(127, 127, 127, 0.22);
++    border-radius: 50%;
++    display: flex;
++    height: 34px;
++    justify-content: center;
++    width: 34px;
++    background: rgba(127, 127, 127, 0.08);
++}
++
++.nozzle-comparison-icon--success {
++    border-color: rgba(76, 175, 80, 0.34);
++}
++
++.nozzle-comparison-icon--warning,
++.nozzle-comparison-icon--error {
++    border-color: rgba(244, 67, 54, 0.34);
++}
++
++.nozzle-filename {
++    border-radius: 5px;
++    padding: 5px 8px;
++    background: rgba(127, 127, 127, 0.06);
++}
++
++.ga-2 {
++    gap: 8px;
++}
++</style>
+diff --git a/src/components/klippertools/StartFlowTool.vue b/src/components/klippertools/StartFlowTool.vue
+new file mode 100644
+index 0000000..db788cb
+--- /dev/null
++++ b/src/components/klippertools/StartFlowTool.vue
+@@ -0,0 +1,175 @@
++<template>
++    <div class="pa-4">
++        <template v-if="status && status.stages.length">
++            <div class="d-flex justify-space-between text-body-2 mb-2">
++                <span>{{ statusText }}</span>
++                <span>{{ etaText }}</span>
++            </div>
++            <v-progress-linear :value="status.progress" :color="progressColor" height="10" rounded class="mb-3" />
++
++            <v-list dense class="start-flow-list transparent pa-0">
++                <v-list-item
++                    v-for="stage in status.stages"
++                    :key="stage.name"
++                    class="start-flow-stage px-0"
++                    :class="'start-flow-stage--' + stage.state">
++                    <v-list-item-icon class="start-flow-stage__icon mr-3">
++                        <v-icon :color="stageColor(stage)" small>{{ stageIcon(stage) }}</v-icon>
++                    </v-list-item-icon>
++                    <v-list-item-content>
++                        <v-list-item-title>{{ stageLabel(stage) }}</v-list-item-title>
++                    </v-list-item-content>
++                    <v-list-item-action-text class="start-flow-stage__time">
++                        {{ stageTime(stage) }}
++                    </v-list-item-action-text>
++                </v-list-item>
++            </v-list>
++        </template>
++
++        <v-alert v-else dense text type="info" class="mb-0">
++            {{ $t('Panels.KlippertoolsPanel.StartFlow.Waiting') }}
++        </v-alert>
++
++        <div v-if="canReset" class="d-flex justify-end mt-2">
++            <v-btn small text @click="reset">
++                <v-icon small left>{{ mdiRefresh }}</v-icon>
++                {{ $t('Panels.KlippertoolsPanel.Common.Reset') }}
++            </v-btn>
++        </div>
++    </div>
++</template>
++
++<script lang="ts">
++import { Component, Mixins } from 'vue-property-decorator'
++import BaseMixin from '@/components/mixins/base'
++import { mdiAlertCircle, mdiCheckCircle, mdiClockOutline, mdiProgressClock, mdiRefresh } from '@mdi/js'
++import { StartFlowStage, StartFlowStatus } from '@/components/klippertools/types'
++
++@Component
++export default class StartFlowTool extends Mixins(BaseMixin) {
++    mdiRefresh = mdiRefresh
++
++    get status(): StartFlowStatus | null {
++        return this.$store.state.printer?.start_flow ?? null
++    }
++
++    get canReset(): boolean {
++        return ['complete', 'error'].includes(this.status?.state ?? '')
++    }
++
++    get progressColor(): string {
++        if (this.status?.state === 'error') return 'error'
++        if (this.status?.state === 'complete') return 'success'
++        return 'primary'
++    }
++
++    get statusText(): string {
++        if (!this.status) return ''
++        if (this.status.state === 'running' && this.status.current_stage) {
++            const stage = this.status.stages.find((item) => item.name === this.status?.current_stage)
++            if (stage) return this.stageLabel(stage)
++        }
++        return String(this.$t(`Panels.KlippertoolsPanel.StartFlow.Status.${this.status.state}`))
++    }
++
++    get etaText(): string {
++        if (!this.status) return ''
++        if (this.status.state === 'complete') {
++            return String(
++                this.$t('Panels.KlippertoolsPanel.StartFlow.CompletedIn', {
++                    time: this.formatDuration(this.status.elapsed_seconds),
++                })
++            )
++        }
++        if (this.status.eta_seconds === null) return ''
++        return String(
++            this.$t('Panels.KlippertoolsPanel.StartFlow.Remaining', {
++                time: this.formatDuration(this.status.eta_seconds),
++            })
++        )
++    }
++
++    stageIcon(stage: StartFlowStage): string {
++        if (stage.state === 'done') return mdiCheckCircle
++        if (stage.state === 'error') return mdiAlertCircle
++        if (stage.state === 'active') return mdiProgressClock
++        return mdiClockOutline
++    }
++
++    stageColor(stage: StartFlowStage): string {
++        if (stage.state === 'done') return 'success'
++        if (stage.state === 'error') return 'error'
++        if (stage.state === 'active') return 'warning'
++        return 'grey'
++    }
++
++    stageLabel(stage: StartFlowStage): string {
++        const key = `Panels.KlippertoolsPanel.StartFlow.Stages.${stage.name}`
++        const translated = String(this.$t(key))
++        return translated === key ? stage.label : translated
++    }
++
++    stageTime(stage: StartFlowStage): string {
++        if (stage.duration_seconds !== null) return this.formatDuration(stage.duration_seconds)
++        return `~${this.formatDuration(stage.estimate_seconds)}`
++    }
++
++    formatDuration(totalSeconds: number): string {
++        const seconds = Math.max(0, Math.round(totalSeconds))
++        const minutes = Math.floor(seconds / 60)
++        const remainder = seconds % 60
++        if (minutes > 0) return `${minutes}m ${String(remainder).padStart(2, '0')}s`
++        return `${remainder}s`
++    }
++
++    reset(): void {
++        this.$socket.emit('printer.gcode.script', { script: 'START_FLOW_RESET' }, { loading: 'startFlow' })
++    }
++}
++</script>
++
++<style scoped>
++.start-flow-list {
++    position: relative;
++}
++
++.start-flow-stage {
++    border-radius: 7px;
++    margin-bottom: 3px;
++    min-height: 42px;
++    padding-right: 8px !important;
++    transition: background-color 160ms ease;
++}
++
++.start-flow-stage--active {
++    background: rgba(255, 193, 7, 0.09);
++}
++
++.start-flow-stage--done {
++    background: rgba(76, 175, 80, 0.035);
++}
++
++.start-flow-stage--error {
++    background: rgba(244, 67, 54, 0.09);
++}
++
++.start-flow-stage__icon {
++    align-items: center;
++    border: 1px solid rgba(127, 127, 127, 0.2);
++    border-radius: 50%;
++    height: 28px;
++    justify-content: center;
++    margin-bottom: 7px !important;
++    margin-top: 7px !important;
++    min-width: 28px;
++    width: 28px;
++    background: rgba(127, 127, 127, 0.08);
++}
++
++.start-flow-stage__time {
++    border-radius: 10px;
++    font-variant-numeric: tabular-nums;
++    padding: 2px 7px;
++    background: rgba(127, 127, 127, 0.08);
++}
++</style>
+diff --git a/src/components/klippertools/types.ts b/src/components/klippertools/types.ts
+new file mode 100644
+index 0000000..12a7645
+--- /dev/null
++++ b/src/components/klippertools/types.ts
+@@ -0,0 +1,62 @@
++export interface NozzleGuardStatus {
++    version: string
++    ready: boolean
++    state: 'no_file' | 'disabled' | 'unknown' | 'match' | 'mismatch' | 'overridden' | 'error'
++    message: string
++    mode: 'block' | 'warn' | 'off'
++    blocking: boolean
++    filename: string | null
++    configured_nozzle: number
++    detected_nozzles: number[]
++    tolerance: number
++    metadata_source: string | null
++    overridden: boolean
++}
++
++export interface StartFlowStage {
++    name: string
++    label: string
++    state: 'pending' | 'active' | 'done' | 'error'
++    duration_seconds: number | null
++    estimate_seconds: number
++}
++
++export interface StartFlowStatus {
++    version: string
++    state: 'idle' | 'running' | 'complete' | 'error'
++    active: boolean
++    message: string
++    error: string | null
++    instrumentation_seen: boolean
++    current_stage: string | null
++    completed_stages: number
++    total_stages: number
++    progress: number
++    eta_seconds: number | null
++    elapsed_seconds: number
++    stages: StartFlowStage[]
++}
++
++export interface MotionWizardResult {
++    type: string
++    frequency: number
++    damping_ratio: number
++    calibrated: boolean
++}
++
++export interface MotionWizardStatus {
++    version: string
++    ready: boolean
++    state: 'idle' | 'ready' | 'running' | 'review' | 'error' | 'unavailable'
++    phase: string
++    active: boolean
++    message: string
++    error: string | null
++    homed_axes: string
++    noise_complete: boolean
++    completed_axes: string[]
++    pending_save: boolean
++    progress: number
++    elapsed_seconds: number
++    results: Record<string, MotionWizardResult>
++}
+diff --git a/src/components/mixins/dashboard.ts b/src/components/mixins/dashboard.ts
+index 7da3685..dc51ab9 100644
+--- a/src/components/mixins/dashboard.ts
++++ b/src/components/mixins/dashboard.ts
+@@ -10,12 +10,18 @@ import {
+     mdiEngine,
+     mdiGamepad,
+     mdiInformation,
++    mdiGrid,
+     mdiLedStrip,
+     mdiPrinter3dNozzle,
++    mdiProgressClock,
++    mdiShieldCheckOutline,
+     mdiThermometerLines,
++    mdiTuneVariant,
+     mdiWebcam,
++    mdiWrenchClock,
+     mdiAdjust,
+     mdiMulticast,
++    mdiToolboxOutline,
+ } from '@mdi/js'
+ import { afcIconLogo } from '@/plugins/afcIcons'
+ 
+@@ -37,6 +43,16 @@ export default class DashboardMixin extends BaseMixin {
+             return group ? group.name : 'Macrogroup'
+         }
+ 
++        const klippertoolsLabels: Record<string, string> = {
++            'nozzle-guard': 'Guard',
++            'start-flow': 'Start',
++            'maintenance-tracker': 'Maintenance',
++            'motion-wizard': 'Motion',
++        }
++        if (name in klippertoolsLabels) {
++            return this.$t(`Panels.KlippertoolsPanel.Tabs.${klippertoolsLabels[name]}`)
++        }
++
+         if (name.includes('-')) {
+             let panelName = ''
+             const subStrings = name.split('-')
+@@ -69,6 +85,18 @@ export default class DashboardMixin extends BaseMixin {
+                 return mdiThermometerLines
+             case 'miniconsole':
+                 return mdiConsoleLine
++            case 'probe-progress':
++                return mdiGrid
++            case 'klippertools':
++                return mdiToolboxOutline
++            case 'nozzle-guard':
++                return mdiShieldCheckOutline
++            case 'start-flow':
++                return mdiProgressClock
++            case 'maintenance-tracker':
++                return mdiWrenchClock
++            case 'motion-wizard':
++                return mdiTuneVariant
+             case 'machine-settings':
+                 return mdiEngine
+             case 'extruder-control':
+diff --git a/src/components/panels/KlippertoolsPanel.vue b/src/components/panels/KlippertoolsPanel.vue
+new file mode 100644
+index 0000000..3cb92e0
+--- /dev/null
++++ b/src/components/panels/KlippertoolsPanel.vue
+@@ -0,0 +1,339 @@
++<template>
++    <panel
++        v-if="socketIsConnected && klipperState !== 'disconnected' && available"
++        :icon="mdiToolboxOutline"
++        :title="$t('Panels.KlippertoolsPanel.Headline')"
++        :collapsible="true"
++        card-class="klippertools-panel"
++        :hide-buttons-on-collapse="true">
++        <template #buttons-title>
++            <v-chip v-if="attentionCount" x-small color="error" outlined class="ml-2">
++                {{ $t('Panels.KlippertoolsPanel.Attention', { count: attentionCount }) }}
++            </v-chip>
++        </template>
++
++        <v-card-text class="klippertools-core">
++            <div class="klippertools-core__identity">
++                <div class="klippertools-core__mark">
++                    <v-icon color="primary">{{ mdiToolboxOutline }}</v-icon>
++                </div>
++                <div class="flex-grow-1">
++                    <div class="font-weight-medium">{{ $t('Panels.KlippertoolsPanel.Headline') }}</div>
++                    <div class="text-caption text--secondary">
++                        {{ $t('Panels.KlippertoolsPanel.Update.Installed', { version: installedVersion }) }}
++                    </div>
++                </div>
++                <v-chip x-small outlined color="success">{{ enabledToolCount }} / 4</v-chip>
++            </div>
++
++            <div class="klippertools-core__tools">
++                <div
++                    v-for="tool in toolStatuses"
++                    :key="tool.key"
++                    class="klippertools-core__tool"
++                    :class="{ 'klippertools-core__tool--available': tool.available }">
++                    <v-icon small>{{ tool.icon }}</v-icon>
++                    <span>{{ tool.label }}</span>
++                    <i />
++                </div>
++            </div>
++
++            <v-btn
++                v-if="updaterAvailable"
++                block
++                small
++                outlined
++                color="primary"
++                :loading="updateStatus.updating"
++                :disabled="printerIsPrinting"
++                @click="openUpdateDialog">
++                <v-icon small left>{{ mdiCloudDownloadOutline }}</v-icon>
++                {{ $t('Panels.KlippertoolsPanel.Update.Action') }}
++            </v-btn>
++        </v-card-text>
++
++        <v-dialog v-model="showUpdateDialog" max-width="520">
++            <v-card>
++                <v-card-title>{{ $t('Panels.KlippertoolsPanel.Update.Title') }}</v-card-title>
++                <v-card-text>
++                    <v-alert v-if="printerIsPrinting" dense text type="warning">
++                        {{ $t('Panels.KlippertoolsPanel.Update.PrintingBlocked') }}
++                    </v-alert>
++                    <p>{{ $t('Panels.KlippertoolsPanel.Update.Description') }}</p>
++                    <div class="text-caption text--secondary">
++                        {{ $t('Panels.KlippertoolsPanel.Update.Installed', { version: installedVersion }) }}
++                    </div>
++                    <v-progress-linear
++                        v-if="updateStatus.updating"
++                        indeterminate
++                        color="primary"
++                        class="mt-4" />
++                    <v-alert
++                        v-if="updateStatus.message"
++                        :type="updateStatus.state === 'error' ? 'error' : updateStatus.state === 'complete' ? 'success' : 'info'"
++                        dense
++                        text
++                        class="mt-4 mb-0">
++                        {{ updateStatus.message }}
++                    </v-alert>
++                </v-card-text>
++                <v-card-actions>
++                    <v-spacer />
++                    <v-btn text :disabled="updateStatus.updating" @click="showUpdateDialog = false">
++                        {{ $t('Buttons.Cancel') }}
++                    </v-btn>
++                    <v-btn
++                        color="primary"
++                        text
++                        :loading="updateStatus.updating"
++                        :disabled="printerIsPrinting || updateStatus.updating"
++                        @click="startUpdate">
++                        {{ $t('Panels.KlippertoolsPanel.Update.Action') }}
++                    </v-btn>
++                </v-card-actions>
++            </v-card>
++        </v-dialog>
++    </panel>
++</template>
++
++<script lang="ts">
++import { Component, Mixins } from 'vue-property-decorator'
++import BaseMixin from '@/components/mixins/base'
++import Panel from '@/components/ui/Panel.vue'
++import {
++    mdiCloudDownloadOutline,
++    mdiProgressClock,
++    mdiShieldCheckOutline,
++    mdiToolboxOutline,
++    mdiTuneVariant,
++    mdiWrenchClock,
++} from '@mdi/js'
++
++interface UpdateStatus {
++    state: string
++    message: string
++    installed_version: string
++    updating: boolean
++    restart_required?: boolean
++}
++
++interface ToolStatus {
++    key: string
++    label: string
++    icon: string
++    available: boolean
++}
++
++@Component({
++    components: {
++        Panel,
++    },
++})
++export default class KlippertoolsPanel extends Mixins(BaseMixin) {
++    mdiCloudDownloadOutline = mdiCloudDownloadOutline
++    mdiProgressClock = mdiProgressClock
++    mdiShieldCheckOutline = mdiShieldCheckOutline
++    mdiToolboxOutline = mdiToolboxOutline
++    mdiTuneVariant = mdiTuneVariant
++    mdiWrenchClock = mdiWrenchClock
++
++    showUpdateDialog = false
++    updateTimer: number | null = null
++    updateStatus: UpdateStatus = {
++        state: 'idle',
++        message: '',
++        installed_version: 'unknown',
++        updating: false,
++    }
++
++    mounted(): void {
++        if (this.updaterAvailable) this.refreshUpdateStatus()
++    }
++
++    beforeDestroy(): void {
++        this.stopUpdatePolling()
++    }
++
++    get available(): boolean {
++        return Boolean(
++            this.$store.state.printer?.nozzle_guard ||
++            this.$store.state.printer?.start_flow ||
++            this.$store.state.printer?.motion_wizard
++        )
++    }
++
++    get attentionCount(): number {
++        const nozzleMismatch = this.$store.state.printer?.nozzle_guard?.blocking ? 1 : 0
++        const maintenance = this.$store.getters['gui/maintenance/getOverdueEntries']?.length ?? 0
++        return nozzleMismatch + maintenance
++    }
++
++    get updaterAvailable(): boolean {
++        return this.moonrakerComponents.includes('klippertools')
++    }
++
++    get installedVersion(): string {
++        return this.updateStatus.installed_version || 'unknown'
++    }
++
++    get toolStatuses(): ToolStatus[] {
++        return [
++            {
++                key: 'guard',
++                label: String(this.$t('Panels.KlippertoolsPanel.Tabs.Guard')),
++                icon: mdiShieldCheckOutline,
++                available: Boolean(this.$store.state.printer?.nozzle_guard),
++            },
++            {
++                key: 'start',
++                label: String(this.$t('Panels.KlippertoolsPanel.Tabs.Start')),
++                icon: mdiProgressClock,
++                available: Boolean(this.$store.state.printer?.start_flow),
++            },
++            {
++                key: 'maintenance',
++                label: String(this.$t('Panels.KlippertoolsPanel.Tabs.Maintenance')),
++                icon: mdiWrenchClock,
++                available: this.available,
++            },
++            {
++                key: 'motion',
++                label: String(this.$t('Panels.KlippertoolsPanel.Tabs.Motion')),
++                icon: mdiTuneVariant,
++                available: Boolean(this.$store.state.printer?.motion_wizard),
++            },
++        ]
++    }
++
++    get enabledToolCount(): number {
++        return this.toolStatuses.filter((tool) => tool.available).length
++    }
++
++    async openUpdateDialog(): Promise<void> {
++        this.showUpdateDialog = true
++        await this.refreshUpdateStatus()
++    }
++
++    async refreshUpdateStatus(): Promise<void> {
++        if (!this.updaterAvailable || !this.socketIsConnected) return
++        try {
++            const status = await this.$socket.emitAndWait('machine.klippertools.status', {})
++            this.updateStatus = { ...this.updateStatus, ...status }
++            if (!this.updateStatus.updating) this.stopUpdatePolling()
++        } catch (error) {
++            this.updateStatus = {
++                ...this.updateStatus,
++                state: 'error',
++                message: this.errorMessage(error),
++                updating: false,
++            }
++            this.stopUpdatePolling()
++        }
++    }
++
++    async startUpdate(): Promise<void> {
++        this.updateStatus = {
++            ...this.updateStatus,
++            state: 'starting',
++            message: String(this.$t('Panels.KlippertoolsPanel.Update.Starting')),
++            updating: true,
++        }
++        try {
++            await this.$socket.emitAndWait('machine.klippertools.update', {})
++            this.startUpdatePolling()
++        } catch (error) {
++            this.updateStatus = {
++                ...this.updateStatus,
++                state: 'error',
++                message: this.errorMessage(error),
++                updating: false,
++            }
++        }
++    }
++
++    startUpdatePolling(): void {
++        this.stopUpdatePolling()
++        this.updateTimer = window.setInterval(() => this.refreshUpdateStatus(), 1500)
++    }
++
++    stopUpdatePolling(): void {
++        if (this.updateTimer !== null) window.clearInterval(this.updateTimer)
++        this.updateTimer = null
++    }
++
++    errorMessage(error: unknown): string {
++        if (typeof error === 'object' && error !== null && 'message' in error) {
++            return String((error as { message: unknown }).message)
++        }
++        return String(this.$t('Panels.KlippertoolsPanel.Update.Failed'))
++    }
++}
++</script>
++
++<style scoped>
++.klippertools-core {
++    padding: 14px 16px 16px;
++}
++
++.klippertools-core__identity {
++    align-items: center;
++    display: flex;
++    gap: 11px;
++    margin-bottom: 12px;
++}
++
++.klippertools-core__mark {
++    align-items: center;
++    border: 1px solid rgba(33, 150, 243, 0.28);
++    border-radius: 9px;
++    display: flex;
++    height: 40px;
++    justify-content: center;
++    width: 40px;
++    background: rgba(33, 150, 243, 0.09);
++}
++
++.klippertools-core__tools {
++    display: grid;
++    grid-template-columns: repeat(2, minmax(0, 1fr));
++    gap: 7px;
++    margin-bottom: 12px;
++}
++
++.klippertools-core__tool {
++    align-items: center;
++    border: 1px solid rgba(127, 127, 127, 0.14);
++    border-radius: 7px;
++    color: rgba(127, 127, 127, 0.82);
++    display: grid;
++    font-size: 0.72rem;
++    gap: 7px;
++    grid-template-columns: auto minmax(0, 1fr) auto;
++    min-width: 0;
++    padding: 7px 8px;
++    background: rgba(127, 127, 127, 0.035);
++}
++
++.klippertools-core__tool span {
++    overflow: hidden;
++    text-overflow: ellipsis;
++    white-space: nowrap;
++}
++
++.klippertools-core__tool i {
++    border-radius: 50%;
++    height: 7px;
++    width: 7px;
++    background: rgba(127, 127, 127, 0.45);
++}
++
++.klippertools-core__tool--available {
++    border-color: rgba(76, 175, 80, 0.22);
++    color: inherit;
++    background: rgba(76, 175, 80, 0.045);
++}
++
++.klippertools-core__tool--available i {
++    background: #66bb6a;
++}
++</style>
+diff --git a/src/components/panels/MaintenanceTrackerPanel.vue b/src/components/panels/MaintenanceTrackerPanel.vue
+new file mode 100644
+index 0000000..292b62b
+--- /dev/null
++++ b/src/components/panels/MaintenanceTrackerPanel.vue
+@@ -0,0 +1,41 @@
++<template>
++    <panel
++        v-if="socketIsConnected && klipperState !== 'disconnected' && available"
++        :icon="mdiWrenchClock"
++        :title="$t('Panels.KlippertoolsPanel.Tabs.Maintenance')"
++        :collapsible="true"
++        card-class="maintenance-tracker-panel"
++        :hide-buttons-on-collapse="true">
++        <template #buttons-title>
++            <v-chip v-if="overdueCount" x-small color="error" outlined class="ml-2">
++                {{ overdueCount }}
++            </v-chip>
++        </template>
++        <maintenance-tracker-tool />
++    </panel>
++</template>
++
++<script lang="ts">
++import { Component, Mixins } from 'vue-property-decorator'
++import BaseMixin from '@/components/mixins/base'
++import MaintenanceTrackerTool from '@/components/klippertools/MaintenanceTrackerTool.vue'
++import Panel from '@/components/ui/Panel.vue'
++import { mdiWrenchClock } from '@mdi/js'
++
++@Component({ components: { MaintenanceTrackerTool, Panel } })
++export default class MaintenanceTrackerPanel extends Mixins(BaseMixin) {
++    mdiWrenchClock = mdiWrenchClock
++
++    get available(): boolean {
++        return Boolean(
++            this.$store.state.printer?.nozzle_guard ||
++            this.$store.state.printer?.start_flow ||
++            this.$store.state.printer?.motion_wizard
++        )
++    }
++
++    get overdueCount(): number {
++        return this.$store.getters['gui/maintenance/getOverdueEntries']?.length ?? 0
++    }
++}
++</script>
+diff --git a/src/components/panels/MotionWizardPanel.vue b/src/components/panels/MotionWizardPanel.vue
+new file mode 100644
+index 0000000..936c959
+--- /dev/null
++++ b/src/components/panels/MotionWizardPanel.vue
+@@ -0,0 +1,28 @@
++<template>
++    <panel
++        v-if="socketIsConnected && klipperState !== 'disconnected' && available"
++        :icon="mdiTuneVariant"
++        :title="$t('Panels.KlippertoolsPanel.Tabs.Motion')"
++        :collapsible="true"
++        card-class="motion-wizard-panel"
++        :hide-buttons-on-collapse="true">
++        <motion-wizard-tool />
++    </panel>
++</template>
++
++<script lang="ts">
++import { Component, Mixins } from 'vue-property-decorator'
++import BaseMixin from '@/components/mixins/base'
++import MotionWizardTool from '@/components/klippertools/MotionWizardTool.vue'
++import Panel from '@/components/ui/Panel.vue'
++import { mdiTuneVariant } from '@mdi/js'
++
++@Component({ components: { MotionWizardTool, Panel } })
++export default class MotionWizardPanel extends Mixins(BaseMixin) {
++    mdiTuneVariant = mdiTuneVariant
++
++    get available(): boolean {
++        return Boolean(this.$store.state.printer?.motion_wizard)
++    }
++}
++</script>
+diff --git a/src/components/panels/NozzleGuardPanel.vue b/src/components/panels/NozzleGuardPanel.vue
+new file mode 100644
+index 0000000..d2ad1ab
+--- /dev/null
++++ b/src/components/panels/NozzleGuardPanel.vue
+@@ -0,0 +1,28 @@
++<template>
++    <panel
++        v-if="socketIsConnected && klipperState !== 'disconnected' && available"
++        :icon="mdiShieldCheckOutline"
++        :title="$t('Panels.KlippertoolsPanel.Tabs.Guard')"
++        :collapsible="true"
++        card-class="nozzle-guard-panel"
++        :hide-buttons-on-collapse="true">
++        <nozzle-guard-tool />
++    </panel>
++</template>
++
++<script lang="ts">
++import { Component, Mixins } from 'vue-property-decorator'
++import BaseMixin from '@/components/mixins/base'
++import NozzleGuardTool from '@/components/klippertools/NozzleGuardTool.vue'
++import Panel from '@/components/ui/Panel.vue'
++import { mdiShieldCheckOutline } from '@mdi/js'
++
++@Component({ components: { NozzleGuardTool, Panel } })
++export default class NozzleGuardPanel extends Mixins(BaseMixin) {
++    mdiShieldCheckOutline = mdiShieldCheckOutline
++
++    get available(): boolean {
++        return Boolean(this.$store.state.printer?.nozzle_guard)
++    }
++}
++</script>
+diff --git a/src/components/panels/ProbeProgressPanel.vue b/src/components/panels/ProbeProgressPanel.vue
+new file mode 100644
+index 0000000..7110a33
+--- /dev/null
++++ b/src/components/panels/ProbeProgressPanel.vue
+@@ -0,0 +1,522 @@
++<template>
++    <panel
++        v-if="socketIsConnected && klipperState !== 'disconnected' && probeProgress"
++        :icon="mdiGrid"
++        :title="$t('Panels.ProbeProgressPanel.Headline')"
++        :collapsible="true"
++        card-class="probe-progress-panel"
++        :hide-buttons-on-collapse="true">
++        <template #buttons-title>
++            <div v-if="hasMatrix" class="probe-progress-header ml-2">
++                <span>{{ columns }} × {{ rows }}</span>
++                <span v-if="isActive">· {{ currentPointLabel }}</span>
++            </div>
++        </template>
++
++        <v-card-text class="probe-progress-content">
++            <template v-if="hasMatrix">
++                <div class="probe-progress-details">
++                    <span class="probe-progress-status">
++                        <span class="probe-progress-status__dot" :class="'probe-progress-status__dot--' + visualState" />
++                        {{ primaryStatus }}
++                    </span>
++                    <v-chip v-if="secondaryStatus" x-small outlined class="probe-progress-sample">
++                        {{ secondaryStatus }}
++                    </v-chip>
++                </div>
++
++                <div class="probe-progress-plate">
++                    <span class="probe-progress-axis probe-progress-axis--y">Y</span>
++                    <div
++                        class="probe-progress-matrix"
++                        role="grid"
++                        :aria-label="$t('Panels.ProbeProgressPanel.MatrixLabel')"
++                        :style="matrixStyle">
++                        <template v-for="(cell, slotIndex) in matrixSlots">
++                            <div
++                                v-if="cell"
++                                :key="'cell-' + cell.index"
++                                class="probe-progress-cell"
++                                :class="'probe-progress-cell--' + cell.state"
++                                role="gridcell"
++                                :title="cellTitle(cell)"
++                                :aria-label="cellTitle(cell)">
++                                <span>{{ cell.index }}</span>
++                            </div>
++                            <div
++                                v-else
++                                :key="'empty-' + slotIndex"
++                                class="probe-progress-cell probe-progress-cell--empty"
++                                aria-hidden="true" />
++                        </template>
++                    </div>
++                    <span class="probe-progress-axis probe-progress-axis--x">X</span>
++                </div>
++
++                <div class="probe-progress-legend" aria-hidden="true">
++                    <span v-for="state in ['pending', 'active', 'done']" :key="state">
++                        <i :class="'probe-progress-legend__swatch--' + state" />
++                        {{ $t(`Panels.ProbeProgressPanel.States.${state}`) }}
++                    </span>
++                </div>
++
++                <v-progress-linear
++                    class="probe-progress-bar"
++                    :value="progress"
++                    :color="progressColor"
++                    background-color="grey darken-3"
++                    height="26"
++                    rounded>
++                    <strong>{{ progressBarText }}</strong>
++                </v-progress-linear>
++
++                <div v-if="probeProgress.error" class="probe-progress-error mt-2">
++                    {{ probeProgress.error }}
++                </div>
++            </template>
++
++            <div v-else class="probe-progress-empty">
++                <v-icon large class="mb-2">{{ mdiGrid }}</v-icon>
++                <div>{{ $t('Panels.ProbeProgressPanel.Ready') }}</div>
++                <small>{{ $t('Panels.ProbeProgressPanel.Empty') }}</small>
++            </div>
++        </v-card-text>
++    </panel>
++</template>
++
++<script lang="ts">
++import { Component, Mixins } from 'vue-property-decorator'
++import BaseMixin from '@/components/mixins/base'
++import Panel from '@/components/ui/Panel.vue'
++import { mdiGrid } from '@mdi/js'
++
++interface ProbeProgressCell {
++    index: number
++    row: number
++    column: number
++    x: number
++    y: number
++    state: 'pending' | 'active' | 'done'
++}
++
++interface ProbeProgressStatus {
++    state: 'idle' | 'probing' | 'complete' | 'error'
++    phase: string
++    active: boolean
++    message: string
++    error: string | null
++    current_point: number
++    completed_points: number
++    total_points: number
++    current_sample: number
++    samples_per_position: number
++    current_retry: number
++    samples_retries: number
++    progress: number
++    eta_state: 'calculating' | 'available'
++    eta_seed_points: number
++    eta_sampled_points: number
++    eta_seconds: number | null
++    elapsed_seconds: number
++    matrix: {
++        rows: number
++        columns: number
++        cells: ProbeProgressCell[]
++    }
++}
++
++@Component({
++    components: {
++        Panel,
++    },
++})
++export default class ProbeProgressPanel extends Mixins(BaseMixin) {
++    mdiGrid = mdiGrid
++
++    get probeProgress(): ProbeProgressStatus | null {
++        return this.$store.state.printer?.probe_progress ?? null
++    }
++
++    get hasMatrix(): boolean {
++        return (this.probeProgress?.matrix?.cells?.length ?? 0) > 0
++    }
++
++    get isActive(): boolean {
++        return this.probeProgress?.active ?? false
++    }
++
++    get rows(): number {
++        return this.probeProgress?.matrix?.rows ?? 0
++    }
++
++    get columns(): number {
++        return this.probeProgress?.matrix?.columns ?? 0
++    }
++
++    get progress(): number {
++        return this.probeProgress?.progress ?? 0
++    }
++
++    get matrixStyle() {
++        return {
++            gridTemplateColumns: `repeat(${this.columns}, minmax(0, 1fr))`,
++        }
++    }
++
++    get matrixSlots(): Array<ProbeProgressCell | null> {
++        const slots: Array<ProbeProgressCell | null> = Array(this.rows * this.columns).fill(null)
++        for (const cell of this.probeProgress?.matrix?.cells ?? []) {
++            const index = cell.row * this.columns + cell.column
++            if (index >= 0 && index < slots.length) slots[index] = cell
++        }
++        return slots
++    }
++
++    get currentPointLabel(): string {
++        return String(
++            this.$t('Panels.ProbeProgressPanel.PointOf', {
++                current: this.probeProgress?.current_point ?? 0,
++                total: this.probeProgress?.total_points ?? 0,
++            })
++        )
++    }
++
++    get primaryStatus(): string {
++        const status = this.probeProgress
++        if (!status) return ''
++        if (status.state === 'complete')
++            return String(this.$t('Panels.ProbeProgressPanel.Complete'))
++        if (status.state === 'error')
++            return String(this.$t('Panels.ProbeProgressPanel.Stopped'))
++        if (status.phase === 'zero_reference')
++            return String(this.$t('Panels.ProbeProgressPanel.ZeroReference'))
++        return this.currentPointLabel
++    }
++
++    get secondaryStatus(): string {
++        const status = this.probeProgress
++        if (!status || !status.active || status.current_point < 1) return ''
++        if (status.current_retry > 0) {
++            return String(
++                this.$t('Panels.ProbeProgressPanel.RetryOf', {
++                    current: status.current_retry,
++                    total: status.samples_retries,
++                })
++            )
++        }
++        return String(
++            this.$t('Panels.ProbeProgressPanel.SampleOf', {
++                current: status.current_sample,
++                total: status.samples_per_position,
++            })
++        )
++    }
++
++    get progressColor(): string {
++        if (this.probeProgress?.state === 'error') return 'error'
++        if (this.probeProgress?.state === 'complete') return '#2e7d32'
++        return '#43a047'
++    }
++
++    get visualState(): string {
++        if (this.probeProgress?.state === 'complete') return 'done'
++        if (this.probeProgress?.state === 'error') return 'error'
++        if (this.probeProgress?.active) return 'active'
++        return 'pending'
++    }
++
++    get progressBarText(): string {
++        const status = this.probeProgress
++        if (!status) return ''
++        const percent = `${Math.round(status.progress)}%`
++
++        if (status.state === 'complete') {
++            return `${percent} · ${String(
++                this.$t('Panels.ProbeProgressPanel.CompleteIn', {
++                    time: this.formatDuration(status.elapsed_seconds),
++                })
++            )}`
++        }
++        if (status.state === 'error')
++            return `${percent} · ${String(this.$t('Panels.ProbeProgressPanel.Stopped'))}`
++        if (status.eta_state === 'available' && status.eta_seconds !== null) {
++            return `${percent} · ${String(
++                this.$t('Panels.ProbeProgressPanel.Remaining', {
++                    time: this.formatDuration(status.eta_seconds),
++                })
++            )}`
++        }
++        return `${percent} · ${String(
++            this.$t('Panels.ProbeProgressPanel.Calculating', {
++                current: status.eta_sampled_points,
++                total: status.eta_seed_points,
++            })
++        )}`
++    }
++
++    formatDuration(totalSeconds: number): string {
++        const seconds = Math.max(0, Math.round(totalSeconds))
++        const hours = Math.floor(seconds / 3600)
++        const minutes = Math.floor((seconds % 3600) / 60)
++        const remainder = seconds % 60
++        if (hours > 0) return `${hours}h ${String(minutes).padStart(2, '0')}m`
++        if (minutes > 0) return `${minutes}m ${String(remainder).padStart(2, '0')}s`
++        return `${remainder}s`
++    }
++
++    cellTitle(cell: ProbeProgressCell): string {
++        return String(
++            this.$t('Panels.ProbeProgressPanel.CellLabel', {
++                point: cell.index,
++                x: cell.x,
++                y: cell.y,
++                state: this.$t(`Panels.ProbeProgressPanel.States.${cell.state}`),
++            })
++        )
++    }
++}
++</script>
++
++<style scoped>
++.probe-progress-header {
++    color: rgba(255, 255, 255, 0.64);
++    font-size: 0.78rem;
++    font-weight: 500;
++    letter-spacing: 0.02em;
++}
++
++.probe-progress-content {
++    padding: 14px 16px 16px;
++}
++
++.probe-progress-details {
++    align-items: center;
++    display: flex;
++    justify-content: space-between;
++    gap: 12px;
++    margin-bottom: 12px;
++    font-size: 0.82rem;
++}
++
++.probe-progress-status {
++    align-items: center;
++    display: inline-flex;
++    font-weight: 600;
++    gap: 8px;
++}
++
++.probe-progress-status__dot {
++    border-radius: 50%;
++    display: inline-block;
++    height: 9px;
++    width: 9px;
++}
++
++.probe-progress-status__dot--pending {
++    background: #ef5350;
++}
++
++.probe-progress-status__dot--active {
++    background: #ffca28;
++    box-shadow: 0 0 0 4px rgba(255, 202, 40, 0.14);
++}
++
++.probe-progress-status__dot--done {
++    background: #66bb6a;
++}
++
++.probe-progress-status__dot--error {
++    background: var(--v-error-base);
++}
++
++.probe-progress-sample {
++    opacity: 0.82;
++}
++
++.probe-progress-plate {
++    position: relative;
++    width: 100%;
++    max-width: 440px;
++    margin: 0 auto 10px;
++    padding: 16px 16px 20px 22px;
++    border: 1px solid rgba(255, 255, 255, 0.1);
++    border-radius: 10px;
++    background:
++        radial-gradient(circle at 50% 35%, rgba(255, 255, 255, 0.05), transparent 62%),
++        rgba(0, 0, 0, 0.2);
++    box-shadow:
++        inset 0 1px 0 rgba(255, 255, 255, 0.05),
++        0 6px 18px rgba(0, 0, 0, 0.16);
++}
++
++.probe-progress-plate::before,
++.probe-progress-plate::after {
++    position: absolute;
++    border-radius: 50%;
++    background: rgba(127, 127, 127, 0.35);
++    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.45);
++    content: '';
++    height: 5px;
++    top: 7px;
++    width: 5px;
++}
++
++.probe-progress-plate::before {
++    left: 8px;
++}
++
++.probe-progress-plate::after {
++    right: 8px;
++}
++
++.probe-progress-matrix {
++    display: grid;
++    gap: 6px;
++}
++
++.probe-progress-axis {
++    position: absolute;
++    color: rgba(127, 127, 127, 0.8);
++    font-size: 0.58rem;
++    font-weight: 800;
++    letter-spacing: 0.08em;
++}
++
++.probe-progress-axis--y {
++    left: 8px;
++    top: 50%;
++    transform: translateY(-50%) rotate(-90deg);
++}
++
++.probe-progress-axis--x {
++    bottom: 5px;
++    left: 50%;
++    transform: translateX(-50%);
++}
++
++.probe-progress-cell {
++    display: flex;
++    align-items: center;
++    justify-content: center;
++    min-width: 0;
++    aspect-ratio: 1;
++    border: 1px solid rgba(255, 255, 255, 0.08);
++    border-radius: 5px;
++    color: rgba(255, 255, 255, 0.86);
++    font-size: clamp(0.56rem, 1vw, 0.74rem);
++    font-weight: 600;
++    transition:
++        background-color 180ms ease,
++        box-shadow 180ms ease,
++        transform 180ms ease;
++}
++
++.probe-progress-cell--pending {
++    background: linear-gradient(145deg, #d43b32, #9f211b);
++    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
++}
++
++.probe-progress-cell--active {
++    z-index: 1;
++    color: #201600;
++    background: linear-gradient(145deg, #ffd54f, #f39c12);
++    box-shadow:
++        0 0 0 2px rgba(255, 213, 79, 0.35),
++        0 0 16px rgba(249, 168, 37, 0.5);
++    transform: scale(1.04);
++    animation: probe-progress-pulse 1.25s ease-in-out infinite;
++}
++
++.probe-progress-cell--done {
++    background: linear-gradient(145deg, #43a047, #24762a);
++    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
++}
++
++.probe-progress-cell--empty {
++    visibility: hidden;
++}
++
++.probe-progress-legend {
++    align-items: center;
++    display: flex;
++    justify-content: center;
++    gap: 14px;
++    margin: 0 0 12px;
++    color: rgba(127, 127, 127, 0.95);
++    font-size: 0.68rem;
++}
++
++.probe-progress-legend span {
++    align-items: center;
++    display: inline-flex;
++    gap: 5px;
++}
++
++.probe-progress-legend i {
++    border-radius: 3px;
++    display: inline-block;
++    height: 8px;
++    width: 8px;
++}
++
++.probe-progress-legend__swatch--pending {
++    background: #c4352c;
++}
++
++.probe-progress-legend__swatch--active {
++    background: #ffca28;
++}
++
++.probe-progress-legend__swatch--done {
++    background: #43a047;
++}
++
++.probe-progress-bar {
++    color: white;
++    font-size: 0.74rem;
++    letter-spacing: 0.01em;
++    box-shadow: inset 0 0 0 1px rgba(127, 127, 127, 0.22);
++}
++
++.probe-progress-error {
++    color: var(--v-error-base);
++    font-size: 0.8rem;
++}
++
++.probe-progress-empty {
++    display: flex;
++    min-height: 150px;
++    flex-direction: column;
++    align-items: center;
++    justify-content: center;
++    color: rgba(255, 255, 255, 0.62);
++    text-align: center;
++}
++
++.probe-progress-empty small {
++    max-width: 320px;
++    margin-top: 4px;
++    color: rgba(255, 255, 255, 0.45);
++}
++
++@keyframes probe-progress-pulse {
++    0%,
++    100% {
++        box-shadow:
++            0 0 0 2px rgba(255, 213, 79, 0.28),
++            0 0 10px rgba(249, 168, 37, 0.36);
++    }
++    50% {
++        box-shadow:
++            0 0 0 3px rgba(255, 213, 79, 0.45),
++            0 0 20px rgba(249, 168, 37, 0.64);
++    }
++}
++
++@media (max-width: 600px) {
++    .probe-progress-matrix {
++        gap: 4px;
++        padding: 8px;
++    }
++}
++</style>
+diff --git a/src/components/panels/StartFlowPanel.vue b/src/components/panels/StartFlowPanel.vue
+new file mode 100644
+index 0000000..436d042
+--- /dev/null
++++ b/src/components/panels/StartFlowPanel.vue
+@@ -0,0 +1,28 @@
++<template>
++    <panel
++        v-if="socketIsConnected && klipperState !== 'disconnected' && available"
++        :icon="mdiProgressClock"
++        :title="$t('Panels.KlippertoolsPanel.Tabs.Start')"
++        :collapsible="true"
++        card-class="start-flow-panel"
++        :hide-buttons-on-collapse="true">
++        <start-flow-tool />
++    </panel>
++</template>
++
++<script lang="ts">
++import { Component, Mixins } from 'vue-property-decorator'
++import BaseMixin from '@/components/mixins/base'
++import Panel from '@/components/ui/Panel.vue'
++import StartFlowTool from '@/components/klippertools/StartFlowTool.vue'
++import { mdiProgressClock } from '@mdi/js'
++
++@Component({ components: { Panel, StartFlowTool } })
++export default class StartFlowPanel extends Mixins(BaseMixin) {
++    mdiProgressClock = mdiProgressClock
++
++    get available(): boolean {
++        return Boolean(this.$store.state.printer?.start_flow)
++    }
++}
++</script>
+diff --git a/src/locales/da.json b/src/locales/da.json
+index 3595edc..9053ea2 100644
+--- a/src/locales/da.json
++++ b/src/locales/da.json
+@@ -618,6 +618,91 @@
+             "SwitchToPrinter": "Skift til printer",
+             "WebcamOff": "Sluk"
+         },
++        "KlippertoolsPanel": {
++            "Attention": "{count} kræver opmærksomhed",
++            "Common": {
++                "Reset": "Nulstil",
++                "Unknown": "Ukendt"
++            },
++            "Headline": "Klippertools",
++            "Maintenance": {
++                "AddTask": "Tilføj opgave",
++                "DaysProgress": "{current} / {total} dage",
++                "Due": "Skal udføres nu",
++                "Empty": "Ingen planlagt vedligeholdelse endnu. Tilføj en gentagen opgave for at følge den her.",
++                "Tracking": "Følges"
++            },
++            "Motion": {
++                "CalibrateHint": "Kør hver akse separat, og gennemgå derefter begge resultater.",
++                "CalibrateTitle": "Kalibrer X og Y",
++                "Home": "Home",
++                "Homed": "Alle akser er homet.",
++                "HomeTitle": "Home printeren",
++                "NewResult": "Nyt resultat",
++                "NoiseComplete": "Accelerometerets støjkontrol er færdig.",
++                "NoiseHint": "Kontrollér, at accelerometeret leverer rene målinger.",
++                "NoiseTitle": "Kontrollér accelerometerstøj",
++                "NotHomed": "X, Y og Z skal være homet før kalibrering.",
++                "ReviewSave": "Gennemgå og gem",
++                "Safety": "Printeren laver hurtige bevægelser med høj acceleration. Ryd pladen, bliv ved printeren, og kør kun guiden, når den er ledig.",
++                "SaveRestart": "Gem og genstart",
++                "SaveTitle": "Gem input-shaper-resultater?",
++                "SaveWarning": "SAVE_CONFIG skriver de gennemgåede X- og Y-værdier til printer.cfg og genstarter Klipper.",
++                "Test": "Test"
++            },
++            "NozzleGuard": {
++                "FileNozzle": "G-code-fil",
++                "KlipperNozzle": "Klipper-konfiguration",
++                "Override": "Tilsidesæt",
++                "OverrideOnce": "Tillad denne fil én gang",
++                "OverrideTitle": "Tilsidesæt bekræftet uoverensstemmelse?",
++                "OverrideWarning": "Den valgte G-code er slicet til en anden dysediameter. Fortsættelse kan give forkert ekstrudering eller ødelægge printet. Tilsidesæt kun, hvis du selv har kontrolleret opsætningen.",
++                "Recheck": "Kontrollér igen",
++                "States": {
++                    "disabled": "Nozzle Guard er deaktiveret i klippertools.cfg.",
++                    "error": "Nozzle Guard kunne ikke kontrollere den valgte fil.",
++                    "match": "Den valgte G-code matcher Klippers konfigurerede dyse.",
++                    "mismatch_blocked": "Der blev fundet en bekræftet uoverensstemmelse i dysediameter. Print er blokeret, indtil opsætningen er rettet eller udtrykkeligt tilsidesat.",
++                    "mismatch_warning": "Der blev fundet en bekræftet uoverensstemmelse i dysediameter. Nozzle Guard er indstillet til kun at advare.",
++                    "no_file": "Vælg en G-code-fil for at sammenligne dysedata.",
++                    "overridden": "Uoverensstemmelsen er godkendt kun for denne valgte fil.",
++                    "unknown": "Der blev ikke fundet læsbare dysedata. Print er tilladt med ukendt status."
++                }
++            },
++            "StartFlow": {
++                "CompletedIn": "færdig på {time}",
++                "Remaining": "cirka {time} tilbage",
++                "Stages": {
++                    "bed_heat": "Opvarmer plade",
++                    "homing": "Homer",
++                    "mesh": "Bed mesh",
++                    "nozzle_heat": "Opvarmer dyse",
++                    "purge": "Purging"
++                },
++                "Status": {
++                    "complete": "Printforberedelsen er færdig",
++                    "error": "Printforberedelsen blev stoppet",
++                    "idle": "Venter på PRINT_START",
++                    "running": "Printforberedelsen kører"
++                },
++                "Waiting": "StartFlow er klar. Trinoversigten vises, når PRINT_START begynder."
++            },
++            "Tabs": {
++                "Guard": "Vagt",
++                "Maintenance": "Service",
++                "Motion": "Bevægelse",
++                "Start": "Start"
++            },
++            "Update": {
++                "Action": "Opdater nu",
++                "Description": "Downloader den konfigurerede Git-gren, kontrollerer alle pakkefiler og opdaterer Klippertools med automatisk tilbagerulning. Klipper og Moonraker genstarter først, når installationen er lykkedes.",
++                "Failed": "Opdateringen kunne ikke startes.",
++                "Installed": "Installeret version: {version}",
++                "PrintingBlocked": "Opdateringer er blokeret, mens et print kører eller er sat på pause.",
++                "Starting": "Starter kontrolleret opdatering…",
++                "Title": "Opdater Klippertools"
++            }
++        },
+         "KlippyStatePanel": {
+             "CheckKlippyAndUdsAddress": "Tjek at Klipper-servicen kører, samt at klippy_uds_address er korrekt konfigureret i moonraker.conf.",
+             "FirmwareRestart": "Genstart alt",
+@@ -677,6 +762,27 @@
+             "On": "Tænd",
+             "PowerControl": "Strømstyring"
+         },
++        "ProbeProgressPanel": {
++            "Calculating": "Beregner resterende tid… {current}/{total}",
++            "CellLabel": "Punkt {point}, X {x}, Y {y}: {state}",
++            "Complete": "Bed mesh færdigt",
++            "CompleteIn": "færdig på {time}",
++            "Empty": "Matrixen vises, når BED_MESH_CALIBRATE starter.",
++            "Headline": "Probe-fremdrift",
++            "MatrixLabel": "Matrix for bed-probing",
++            "PointOf": "Punkt {current} af {total}",
++            "Ready": "Klar til bed mesh",
++            "Remaining": "cirka {time} tilbage",
++            "RetryOf": "Nyt forsøg {current} af {total}",
++            "SampleOf": "Måling {current} af {total}",
++            "States": {
++                "active": "måles",
++                "done": "færdig",
++                "pending": "uberørt"
++            },
++            "Stopped": "Probing stoppet",
++            "ZeroReference": "Måler nulreference"
++        },
+         "SpoolmanPanel": {
+             "ChangeSpool": "Skift spool",
+             "DaysAgo": "{days} dage siden",
+diff --git a/src/locales/en.json b/src/locales/en.json
+index a46e38b..c86a904 100644
+--- a/src/locales/en.json
++++ b/src/locales/en.json
+@@ -720,6 +720,91 @@
+             "SwitchToPrinter": "Switch to Printer",
+             "WebcamOff": "Off"
+         },
++        "KlippertoolsPanel": {
++            "Attention": "{count} needs attention",
++            "Common": {
++                "Reset": "Reset",
++                "Unknown": "Unknown"
++            },
++            "Headline": "Klippertools",
++            "Maintenance": {
++                "AddTask": "Add task",
++                "DaysProgress": "{current} / {total} days",
++                "Due": "Due now",
++                "Empty": "No scheduled maintenance yet. Add a repeating task to begin tracking it here.",
++                "Tracking": "Tracking"
++            },
++            "Motion": {
++                "CalibrateHint": "Run each axis separately, then review both results.",
++                "CalibrateTitle": "Calibrate X and Y",
++                "Home": "Home",
++                "Homed": "All axes are homed.",
++                "HomeTitle": "Home the printer",
++                "NewResult": "New result",
++                "NoiseComplete": "Accelerometer noise check complete.",
++                "NoiseHint": "Verify that the accelerometer is returning clean samples.",
++                "NoiseTitle": "Check accelerometer noise",
++                "NotHomed": "X, Y, and Z must be homed before calibration.",
++                "ReviewSave": "Review & save",
++                "Safety": "The printer will make rapid, high-acceleration moves. Clear the bed, stay beside the printer, and run this only while idle.",
++                "SaveRestart": "Save and restart",
++                "SaveTitle": "Save input shaper results?",
++                "SaveWarning": "SAVE_CONFIG will write the reviewed X and Y values to printer.cfg and restart Klipper.",
++                "Test": "Test"
++            },
++            "NozzleGuard": {
++                "FileNozzle": "G-code file",
++                "KlipperNozzle": "Klipper configuration",
++                "Override": "Override",
++                "OverrideOnce": "Allow this file once",
++                "OverrideTitle": "Override confirmed mismatch?",
++                "OverrideWarning": "The selected G-code was sliced for a different nozzle diameter. Continuing may produce incorrect extrusion or damage the print. Only override if you have independently verified the setup.",
++                "Recheck": "Recheck",
++                "States": {
++                    "disabled": "Nozzle Guard is disabled in klippertools.cfg.",
++                    "error": "Nozzle Guard could not inspect the selected file.",
++                    "match": "The selected G-code matches Klipper's configured nozzle.",
++                    "mismatch_blocked": "A confirmed nozzle mismatch was found. Printing is blocked until the setup is corrected or explicitly overridden.",
++                    "mismatch_warning": "A confirmed nozzle mismatch was found. Nozzle Guard is configured to warn without blocking.",
++                    "no_file": "Select a G-code file to compare its nozzle metadata.",
++                    "overridden": "The mismatch is acknowledged for this selected file only.",
++                    "unknown": "No readable nozzle metadata was found. Printing is allowed with an unknown status."
++                }
++            },
++            "StartFlow": {
++                "CompletedIn": "complete in {time}",
++                "Remaining": "about {time} remaining",
++                "Stages": {
++                    "bed_heat": "Heating bed",
++                    "homing": "Homing",
++                    "mesh": "Bed mesh",
++                    "nozzle_heat": "Heating nozzle",
++                    "purge": "Purging"
++                },
++                "Status": {
++                    "complete": "Print preparation complete",
++                    "error": "Print preparation stopped",
++                    "idle": "Waiting for PRINT_START",
++                    "running": "Print preparation is running"
++                },
++                "Waiting": "StartFlow is ready. Its stage timeline appears when PRINT_START begins."
++            },
++            "Tabs": {
++                "Guard": "Guard",
++                "Maintenance": "Service",
++                "Motion": "Motion",
++                "Start": "Start"
++            },
++            "Update": {
++                "Action": "Update now",
++                "Description": "Downloads the configured Git branch, verifies every packaged file, and updates Klippertools with automatic rollback. Klipper and Moonraker restart only after deployment succeeds.",
++                "Failed": "The update could not be started.",
++                "Installed": "Installed version: {version}",
++                "PrintingBlocked": "Updates are blocked while a print is active or paused.",
++                "Starting": "Starting verified update…",
++                "Title": "Update Klippertools"
++            }
++        },
+         "KlippyStatePanel": {
+             "CheckKlippyAndUdsAddress": "Please check if the Klipper service is running and klippy_uds_address is correctly configured in the moonraker.conf.",
+             "FirmwareRestart": "Firmware Restart",
+@@ -955,6 +1040,27 @@
+             "On": "On",
+             "PowerControl": "Power Control"
+         },
++        "ProbeProgressPanel": {
++            "Calculating": "Calculating remaining time… {current}/{total}",
++            "CellLabel": "Point {point}, X {x}, Y {y}: {state}",
++            "Complete": "Bed mesh complete",
++            "CompleteIn": "complete in {time}",
++            "Empty": "The matrix appears when BED_MESH_CALIBRATE starts.",
++            "Headline": "Probe Progress",
++            "MatrixLabel": "Bed probing matrix",
++            "PointOf": "Point {current} of {total}",
++            "Ready": "Ready for bed mesh",
++            "Remaining": "approximately {time} remaining",
++            "RetryOf": "Retry {current} of {total}",
++            "SampleOf": "Sample {current} of {total}",
++            "States": {
++                "active": "probing",
++                "done": "complete",
++                "pending": "untouched"
++            },
++            "Stopped": "Probing stopped",
++            "ZeroReference": "Probing zero reference"
++        },
+         "SpoolmanPanel": {
+             "ActiveSpool": "Active Spool",
+             "ChangeSpool": "Change Spool",
+diff --git a/src/pages/Dashboard.vue b/src/pages/Dashboard.vue
+index 7327676..3e8648b 100644
+--- a/src/pages/Dashboard.vue
++++ b/src/pages/Dashboard.vue
+@@ -93,6 +93,12 @@ import MacrosPanel from '@/components/panels/MacrosPanel.vue'
+ import MiniconsolePanel from '@/components/panels/MiniconsolePanel.vue'
+ import MinSettingsPanel from '@/components/panels/MinSettingsPanel.vue'
+ import MiscellaneousPanel from '@/components/panels/MiscellaneousPanel.vue'
++import KlippertoolsPanel from '@/components/panels/KlippertoolsPanel.vue'
++import MaintenanceTrackerPanel from '@/components/panels/MaintenanceTrackerPanel.vue'
++import MotionWizardPanel from '@/components/panels/MotionWizardPanel.vue'
++import NozzleGuardPanel from '@/components/panels/NozzleGuardPanel.vue'
++import ProbeProgressPanel from '@/components/panels/ProbeProgressPanel.vue'
++import StartFlowPanel from '@/components/panels/StartFlowPanel.vue'
+ import SpoolmanPanel from '@/components/panels/SpoolmanPanel.vue'
+ import MmuPanel from '@/components/panels/MmuPanel.vue'
+ import StatusPanel from '@/components/panels/StatusPanel.vue'
+@@ -112,6 +118,12 @@ import WebcamPanel from '@/components/panels/WebcamPanel.vue'
+         MiniconsolePanel,
+         MinSettingsPanel,
+         MiscellaneousPanel,
++        KlippertoolsPanel,
++        MaintenanceTrackerPanel,
++        MotionWizardPanel,
++        NozzleGuardPanel,
++        ProbeProgressPanel,
++        StartFlowPanel,
+         SpoolmanPanel,
+         MmuPanel,
+         StatusPanel,
+diff --git a/src/store/gui/getters.ts b/src/store/gui/getters.ts
+index 2da2695..a282534 100644
+--- a/src/store/gui/getters.ts
++++ b/src/store/gui/getters.ts
+@@ -106,6 +106,24 @@ export const getters: GetterTree<GuiState, RootState> = {
+             allPanels = allPanels.filter((name) => name !== 'led-effects')
+         }
+ 
++        // Probe Progress is provided by the optional Klipper extra.
++        if (!rootState.printer?.probe_progress) {
++            allPanels = allPanels.filter((name) => name !== 'probe-progress')
++        }
++
++        const klippertoolsAvailable = Boolean(
++            rootState.printer?.nozzle_guard || rootState.printer?.start_flow || rootState.printer?.motion_wizard
++        )
++        if (!klippertoolsAvailable) {
++            allPanels = allPanels.filter((name) => !['klippertools', 'maintenance-tracker'].includes(name))
++        }
++        if (!rootState.printer?.nozzle_guard)
++            allPanels = allPanels.filter((name) => name !== 'nozzle-guard')
++        if (!rootState.printer?.start_flow)
++            allPanels = allPanels.filter((name) => name !== 'start-flow')
++        if (!rootState.printer?.motion_wizard)
++            allPanels = allPanels.filter((name) => name !== 'motion-wizard')
++
+         return allPanels
+     },
+ 
+@@ -123,6 +141,19 @@ export const getters: GetterTree<GuiState, RootState> = {
+                 const missingPanels: GuiStateLayoutoption[] = []
+ 
+                 allPossiblePanels.forEach((panelname: string) => {
++                    // This panel is inserted beside the console below so an
++                    // existing dashboard opens in the expected column.
++                    if (
++                        [
++                            'probe-progress',
++                            'klippertools',
++                            'nozzle-guard',
++                            'start-flow',
++                            'maintenance-tracker',
++                            'motion-wizard',
++                        ].includes(panelname)
++                    )
++                        return
+                     if (!allViewportPanels.find((panel) => panel.name === panelname))
+                         missingPanels.push({
+                             name: panelname,
+@@ -132,6 +163,30 @@ export const getters: GetterTree<GuiState, RootState> = {
+                 panels = panels.concat(missingPanels)
+             }
+ 
++            const anchoredPanels = [
++                'probe-progress',
++                'klippertools',
++                'nozzle-guard',
++                'start-flow',
++                'maintenance-tracker',
++                'motion-wizard',
++            ]
++            const allViewportPanels = getters['getAllPanelsFromViewport'](viewport) as GuiStateLayoutoption[]
++            anchoredPanels.forEach((panelName) => {
++                if (!allPossiblePanels.includes(panelName)) return
++                const alreadyPlaced = allViewportPanels.some((panel) => panel.name === panelName)
++                if (alreadyPlaced) return
++                const panelIndex = anchoredPanels.indexOf(panelName)
++                const previousPanel = panelIndex > 0 ? anchoredPanels[panelIndex - 1] : 'miniconsole'
++                let anchorIndex = panels.findIndex((panel) => panel.name === previousPanel)
++                if (anchorIndex === -1) anchorIndex = panels.findIndex((panel) => panel.name === 'miniconsole')
++                if (anchorIndex === -1) return
++                panels.splice(anchorIndex + 1, 0, {
++                    name: panelName,
++                    visible: true,
++                })
++            })
++
+             if (onlyVisible) {
+                 panels = panels.filter((element) => element.visible)
+             }
+diff --git a/src/store/gui/index.ts b/src/store/gui/index.ts
+index 6249c23..a4e46e1 100644
+--- a/src/store/gui/index.ts
++++ b/src/store/gui/index.ts
+@@ -78,6 +78,12 @@ export const getDefaultState = (): GuiState => {
+                 { name: 'miscellaneous', visible: true },
+                 { name: 'temperature', visible: true },
+                 { name: 'miniconsole', visible: false },
++                { name: 'probe-progress', visible: true },
++                { name: 'klippertools', visible: true },
++                { name: 'nozzle-guard', visible: true },
++                { name: 'start-flow', visible: true },
++                { name: 'maintenance-tracker', visible: true },
++                { name: 'motion-wizard', visible: true },
+             ],
+             tabletLayout1: [
+                 { name: 'webcam', visible: true },
+@@ -90,6 +96,12 @@ export const getDefaultState = (): GuiState => {
+             tabletLayout2: [
+                 { name: 'temperature', visible: true },
+                 { name: 'miniconsole', visible: true },
++                { name: 'probe-progress', visible: true },
++                { name: 'klippertools', visible: true },
++                { name: 'nozzle-guard', visible: true },
++                { name: 'start-flow', visible: true },
++                { name: 'maintenance-tracker', visible: true },
++                { name: 'motion-wizard', visible: true },
+             ],
+             desktopLayout1: [
+                 { name: 'webcam', visible: true },
+@@ -102,6 +114,12 @@ export const getDefaultState = (): GuiState => {
+             desktopLayout2: [
+                 { name: 'temperature', visible: true },
+                 { name: 'miniconsole', visible: true },
++                { name: 'probe-progress', visible: true },
++                { name: 'klippertools', visible: true },
++                { name: 'nozzle-guard', visible: true },
++                { name: 'start-flow', visible: true },
++                { name: 'maintenance-tracker', visible: true },
++                { name: 'motion-wizard', visible: true },
+             ],
+             widescreenLayout1: [
+                 { name: 'toolhead-control', visible: true },
+@@ -116,6 +134,12 @@ export const getDefaultState = (): GuiState => {
+             widescreenLayout3: [
+                 { name: 'webcam', visible: true },
+                 { name: 'miniconsole', visible: true },
++                { name: 'probe-progress', visible: true },
++                { name: 'klippertools', visible: true },
++                { name: 'nozzle-guard', visible: true },
++                { name: 'start-flow', visible: true },
++                { name: 'maintenance-tracker', visible: true },
++                { name: 'motion-wizard', visible: true },
+             ],
+         },
+         editor: {
+diff --git a/src/store/variables.ts b/src/store/variables.ts
+index b940783..548c250 100644
+--- a/src/store/variables.ts
++++ b/src/store/variables.ts
+@@ -116,6 +116,12 @@ export const allDashboardPanels = [
+     'led-effects',
+     'machine-settings',
+     'miniconsole',
++    'probe-progress',
++    'klippertools',
++    'nozzle-guard',
++    'start-flow',
++    'maintenance-tracker',
++    'motion-wizard',
+     'miscellaneous',
+     'spoolman',
+     'mmu',
