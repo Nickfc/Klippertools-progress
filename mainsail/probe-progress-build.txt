@@ -1,0 +1,2 @@
+Klipper Probe Progress UI 0.1.0
+Compatible with the Mainsail version named by the distribution archive.

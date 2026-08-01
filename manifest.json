@@ -1,0 +1,16 @@
+{
+  "name": "klipper-probe-progress",
+  "version": "0.1.0",
+  "released": "2026-08-01",
+  "repository": "https://github.com/Nickfc/Klippertools-progress",
+  "klipper_tested": [
+    "v0.13.0-660-g616242d4",
+    "v0.13.0-708-g7046bd00"
+  ],
+  "mainsail_builds": [
+    "v2.17.0",
+    "v2.18.2"
+  ],
+  "default_eta_seed_points": 3,
+  "supported_probe_method": "automatic"
+}

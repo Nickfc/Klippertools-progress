@@ -1,0 +1,42 @@
+name: Validate
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Run Python tests
+        run: python3 -m unittest discover -s tests -v
+
+      - name: Check Python syntax
+        run: |
+          python3 -m py_compile \
+            klipper/probe_progress.py \
+            scripts/configure.py \
+            tests/test_probe_progress.py \
+            tests/test_configure.py
+
+      - name: Check shell syntax
+        run: |
+          bash -n \
+            install-online.sh \
+            scripts/install.sh \
+            scripts/uninstall.sh \
+            scripts/check-install.sh
+
+      - name: Verify release files
+        run: |
+          sha256sum -c SHA256SUMS
+          unzip -tq dist/mainsail-v2.17.0-probe-progress.zip
+          unzip -tq dist/mainsail-v2.18.2-probe-progress.zip
+          unzip -tq source/mainsail-v2.17.0-probe-progress-source.zip
+          unzip -tq source/mainsail-v2.18.2-probe-progress-source.zip
