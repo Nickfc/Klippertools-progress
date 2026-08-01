@@ -9,7 +9,7 @@ import os
 import re
 
 
-PLUGIN_VERSION = "0.2.0"
+PLUGIN_VERSION = "0.2.1"
 DEFAULT_SCAN_BYTES = 512 * 1024
 
 

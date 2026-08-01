@@ -24,8 +24,11 @@ run_for_version() {
 
     mkdir -p \
         "$test_root/klipper/klippy/extras" \
+        "$test_root/moonraker/moonraker/components" \
         "$test_root/printer_data/config" \
         "$test_root/mainsail"
+    cp -a "$SUITE_ROOT" "$test_root/klippertools"
+    local suite_copy="$test_root/klippertools"
     printf '%s\n' "$version" > "$test_root/mainsail/.version"
     printf 'original-ui\n' > "$test_root/mainsail/index.html"
     printf '{"theme":"original"}\n' > "$test_root/mainsail/config.json"
@@ -33,6 +36,8 @@ run_for_version() {
         > "$test_root/klipper/klippy/extras/probe_progress.py"
     printf 'previous-suite-config\n' \
         > "$test_root/printer_data/config/klippertools.cfg"
+    printf '[server]\nhost: 0.0.0.0\n' \
+        > "$test_root/printer_data/config/moonraker.conf"
 
     cat > "$test_root/printer_data/config/printer.cfg" <<'CFG'
 [include mainsail.cfg]
@@ -56,7 +61,7 @@ gcode:
     M104 S0
 CFG
     if [[ "$version" == v2.18.2 ]]; then
-        python3 "$SUITE_ROOT/scripts/configure.py" add \
+        python3 "$suite_copy/scripts/configure.py" add \
             "$test_root/printer_data/config/printer.cfg" >/dev/null
     fi
     cp -a "$test_root/printer_data/config/printer.cfg" \
@@ -64,9 +69,10 @@ CFG
 
     local -a runner
     if [[ $EUID -eq 0 ]]; then
-        runner=(env "HOME=$test_root" _KLIPPERTOOLS_TEST_ALLOW_ROOT=1)
+        runner=(env "HOME=$test_root" _KLIPPERTOOLS_TEST_ALLOW_ROOT=1 \
+            _KLIPPERTOOLS_TEST_PRINT_STATE=standby)
     else
-        runner=(env "HOME=$test_root")
+        runner=(env "HOME=$test_root" _KLIPPERTOOLS_TEST_PRINT_STATE=standby)
     fi
 
     "${runner[@]}" \
@@ -74,7 +80,8 @@ CFG
         PRINTER_DATA_DIR="$test_root/printer_data" \
         CONFIG_DIR="$test_root/printer_data/config" \
         MAINSAIL_DIR="$test_root/mainsail" \
-        "$SUITE_ROOT/scripts/install.sh" >/dev/null
+        MOONRAKER_DIR="$test_root/moonraker" \
+        "$suite_copy/scripts/install.sh" >/dev/null
 
     for backend in probe_progress nozzle_guard start_flow motion_wizard; do
         [[ -f "$test_root/klipper/klippy/extras/$backend.py" ]] ||
@@ -94,13 +101,15 @@ CFG
         PRINTER_DATA_DIR="$test_root/printer_data" \
         CONFIG_DIR="$test_root/printer_data/config" \
         MAINSAIL_DIR="$test_root/mainsail" \
-        "$SUITE_ROOT/scripts/check-install.sh" >/dev/null
+        MOONRAKER_DIR="$test_root/moonraker" \
+        "$suite_copy/scripts/check-install.sh" >/dev/null
 
     printf '{"theme":"changed-after-install"}\n' \
         > "$test_root/mainsail/config.json"
     "${runner[@]}" \
         PRINTER_DATA_DIR="$test_root/printer_data" \
-        "$SUITE_ROOT/scripts/uninstall.sh" >/dev/null
+        MOONRAKER_DIR="$test_root/moonraker" \
+        "$suite_copy/scripts/uninstall.sh" >/dev/null
 
     cmp -s "$test_root/printer.cfg.original" \
         "$test_root/printer_data/config/printer.cfg" ||
@@ -119,6 +128,8 @@ CFG
         fail "$version did not preserve the latest Mainsail settings"
     [[ ! -e "$test_root/printer_data/klippertools-install-state" ]] ||
         fail "$version left an active install state behind"
+    [[ ! -e "$test_root/klippertools" ]] ||
+        fail "$version left its source checkout behind"
 
     trap - RETURN
     cleanup_case

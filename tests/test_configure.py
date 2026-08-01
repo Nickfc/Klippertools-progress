@@ -22,13 +22,16 @@ class ConfigureTest(unittest.TestCase):
         self.assertTrue(changed)
         self.assertIn(
             "[include mainsail.cfg]\n"
-            "\n"
+            "# >>> KLIPPERTOOLS SUITE: printer.cfg >>>\n"
             "# Added by Klippertools Suite\n"
             "[include klippertools.cfg]\n"
-            "\n"
+            "# <<< KLIPPERTOOLS SUITE: printer.cfg <<<\n"
             "[mcu]",
             updated,
         )
+        restored, removed = MODULE.remove_include(updated)
+        self.assertTrue(removed)
+        self.assertEqual(restored, original)
 
     def test_add_is_idempotent(self):
         original = (
@@ -69,6 +72,25 @@ class ConfigureTest(unittest.TestCase):
         self.assertNotIn("klippertools.cfg", updated)
         self.assertIn("[include mainsail.cfg]", updated)
         self.assertIn("serial: /dev/example", updated)
+
+    def test_roundtrip_preserves_unrelated_blank_runs_exactly(self):
+        original = (
+            "[include mainsail.cfg]\n"
+            "\n"
+            "\n"
+            "[mcu]\n"
+            "serial: /dev/example\n"
+            "\n"
+            "\n"
+            "\n"
+            "[printer]\n"
+            "kinematics: corexy\n"
+        )
+        installed, changed = MODULE.add_include(original)
+        restored, removed = MODULE.remove_include(installed)
+        self.assertTrue(changed)
+        self.assertTrue(removed)
+        self.assertEqual(restored, original)
 
 
 if __name__ == "__main__":

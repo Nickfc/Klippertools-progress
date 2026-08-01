@@ -7,7 +7,10 @@ fail() {
 }
 
 if [[ $EUID -eq 0 ]]; then
-    fail "run this as the normal Klipper user, not root"
+    if [[ ${_KLIPPERTOOLS_TEST_ALLOW_ROOT:-0} != 1 || \
+          $HOME != /tmp/klippertools-* ]]; then
+        fail "run this as the normal Klipper user, not root"
+    fi
 fi
 
 REPOSITORY_URL="${KLIPPERTOOLS_REPOSITORY_URL:-${PROBE_PROGRESS_REPOSITORY_URL:-https://github.com/Nickfc/Klippertools-progress.git}}"
@@ -19,6 +22,13 @@ case "$TARGET_DIR" in
     "$HOME"/*) ;;
     *) fail "the install directory must be inside $HOME" ;;
 esac
+case "$REPOSITORY_URL" in
+    https://*|ssh://*|git@*|file://*) ;;
+    *) fail "unsupported or unsafe repository URL" ;;
+esac
+[[ "$REPOSITORY_URL" != -* ]] || fail "unsafe repository URL"
+git check-ref-format --branch "$REPOSITORY_REF" >/dev/null 2>&1 ||
+    fail "invalid repository ref: $REPOSITORY_REF"
 
 for required_command in git sha256sum python3 unzip mktemp mv rm; do
     command -v "$required_command" >/dev/null 2>&1 ||
@@ -42,7 +52,7 @@ trap cleanup EXIT
 
 printf 'Downloading Klippertools Suite from GitHub...\n'
 git clone --quiet --depth 1 --branch "$REPOSITORY_REF" \
-    "$REPOSITORY_URL" "$DOWNLOAD_DIR/repository"
+    -- "$REPOSITORY_URL" "$DOWNLOAD_DIR/repository"
 
 (
     cd "$DOWNLOAD_DIR/repository"
@@ -50,8 +60,17 @@ git clone --quiet --depth 1 --branch "$REPOSITORY_REF" \
 )
 
 mv "$DOWNLOAD_DIR/repository" "$TARGET_DIR"
-trap - EXIT
-cleanup
 
 printf 'Download verified. Starting the transactional installer...\n'
-"$TARGET_DIR/scripts/install.sh"
+export KLIPPERTOOLS_SOURCE_URL="$REPOSITORY_URL"
+export KLIPPERTOOLS_SOURCE_REF="$REPOSITORY_REF"
+if ! "$TARGET_DIR/scripts/install.sh" "$@"; then
+    # If rollback completed there is no journal and the verified checkout can
+    # be removed, allowing a clean retry.  If a power-loss journal remains,
+    # keep the checkout because it may assist manual inspection.
+    if [[ ! -e "${PRINTER_DATA_DIR:-$HOME/printer_data}/klippertools-transaction.json" && \
+          -d "$TARGET_DIR" ]]; then
+        mv "$TARGET_DIR" "$DOWNLOAD_DIR/failed-repository"
+    fi
+    fail "installation did not complete"
+fi

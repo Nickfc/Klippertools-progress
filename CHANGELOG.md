@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.2.1 - 2026-08-01
+
+- Added an authenticated Update button to the Klippertools Mainsail panel.
+- Added a Moonraker update controller that refuses updates while printing or
+  paused and launches commands without a shell.
+- Added a verified online updater that stages a fresh checkout before replacing
+  any installed files or the active source checkout.
+- Replaced transient shell rollback with an fsynced transaction journal and a
+  stable recovery helper under `~/printer_data/klippertools-recovery/`.
+- Added printer-idle enforcement to install, update, recovery, and uninstall;
+  `--offline` is an explicit manual override when Moonraker is unavailable.
+- Fixed printer.cfg removal so unrelated blank lines are preserved byte for
+  byte, using explicit ownership markers and the original backup when safe.
+- Expanded `check-install.sh` to validate content hashes, Python syntax,
+  Moonraker wiring, transaction state, and the complete deployed Mainsail file
+  manifest instead of checking only for file existence.
+- Uninstall now archives the source checkout as well, allowing a clean online
+  reinstall while retaining recovery material.
+- Added corruption, normal update, print interlock, and simulated power-loss
+  recovery tests for install, update, and uninstall.
+
 ## 0.2.0 - 2026-08-01
 
 - Add the shared tabbed Klippertools UI Core below Probe Progress.

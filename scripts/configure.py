@@ -9,6 +9,8 @@ import tempfile
 
 INCLUDE_LINE = "[include klippertools.cfg]"
 COMMENT_LINE = "# Added by Klippertools Suite"
+BEGIN_LINE = "# >>> KLIPPERTOOLS SUITE: printer.cfg >>>"
+END_LINE = "# <<< KLIPPERTOOLS SUITE: printer.cfg <<<"
 
 
 def add_include(text):
@@ -33,32 +35,51 @@ def add_include(text):
     if mainsail is not None:
         insertion = mainsail + 1
 
-    block = [COMMENT_LINE + "\n", INCLUDE_LINE + "\n"]
-    if insertion and lines[insertion - 1].strip():
-        block.insert(0, "\n")
-    if insertion < len(lines) and lines[insertion].strip():
-        block.append("\n")
+    # Everything inserted is inside explicit ownership markers.  Removing the
+    # block can therefore reproduce every unrelated byte, including deliberate
+    # runs of blank lines elsewhere in printer.cfg.
+    block = [
+        BEGIN_LINE + "\n",
+        COMMENT_LINE + "\n",
+        INCLUDE_LINE + "\n",
+        END_LINE + "\n",
+    ]
     lines[insertion:insertion] = block
     return "".join(lines), True
 
 
 def remove_include(text):
     lines = text.splitlines(keepends=True)
-    output = []
-    changed = False
-    for line in lines:
-        stripped = line.strip()
-        if stripped in (INCLUDE_LINE, COMMENT_LINE):
-            changed = True
-            continue
-        output.append(line)
+    start = next(
+        (index for index, line in enumerate(lines) if line.strip() == BEGIN_LINE),
+        None,
+    )
+    if start is not None:
+        end = next(
+            (
+                index
+                for index in range(start + 1, len(lines))
+                if lines[index].strip() == END_LINE
+            ),
+            None,
+        )
+        if end is None:
+            raise ValueError("incomplete Klippertools printer.cfg marker block")
+        del lines[start : end + 1]
+        return "".join(lines), True
 
-    # Collapse only the extra blank run that our two-line block may leave.
-    compact = []
-    for line in output:
-        if line.strip() or not compact or compact[-1].strip():
-            compact.append(line)
-    return "".join(compact), changed
+    # Compatibility with 0.2.0: remove only an adjacent installer comment and
+    # include.  Never compact global whitespace; exact restoration is handled
+    # from the transaction backup when printer.cfg was otherwise unchanged.
+    for index, line in enumerate(lines):
+        if line.strip() != INCLUDE_LINE:
+            continue
+        start = index
+        if index and lines[index - 1].strip() == COMMENT_LINE:
+            start -= 1
+        del lines[start : index + 1]
+        return "".join(lines), True
+    return text, False
 
 
 def atomic_write(path, text):

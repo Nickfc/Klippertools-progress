@@ -3,8 +3,10 @@
 ## Suite boundary
 
 Klippertools uses four small Klipper extras, Mainsail's existing maintenance
-store, and one shared native Mainsail panel. No Moonraker component or custom
-network endpoint is required.
+store, one shared native Mainsail panel, and a narrow Moonraker component for
+authenticated lifecycle updates. The Moonraker component does not control
+motion or alter G-code; it only enforces idle state and starts the journaled
+updater.
 
 | Tool | Runtime source | Status object |
 | --- | --- | --- |
@@ -13,6 +15,7 @@ network endpoint is required.
 | StartFlow | `start_flow.py` | `start_flow` |
 | Maintenance | Mainsail/Moonraker database | `gui/maintenance` |
 | Motion Wizard | `motion_wizard.py` | `motion_wizard` |
+| Suite updater | `moonraker/klippertools.py` | Moonraker API |
 
 Mainsail already subscribes to every available Klipper status object. The
 Klippertools UI therefore receives real-time state through the normal
@@ -99,14 +102,33 @@ confirmation dialog after both X and Y have new results.
 
 ## Installation model
 
-The installer copies the four extras, one configuration include, a
-version-matched Mainsail build, and optional StartFlow markers. Before mutation
-it saves `printer.cfg`, every pre-existing managed file, and the complete
-Mainsail tree. A trap restores originals after any failed operation.
+Install, update, recovery, and uninstall share `scripts/lifecycle.py`. Before
+the first managed mutation it snapshots every target and atomically writes an
+fsynced JSON journal under `printer_data`. UI and source directory swaps use
+same-filesystem renames. Ordinary exceptions invoke recovery immediately;
+SIGKILL or power loss leaves enough persistent state for the separately copied
+recovery helper to reconstruct the previous coherent installation.
 
-Uninstall uses the recorded paths and existence flags, validates every path
-under the normal user's home, reverses only recorded changes, preserves the
-latest Mainsail `config.json`, and retains recovery material.
+Every mutating operation queries Moonraker's `print_stats` object and rejects
+`printing` and `paused`. An unavailable or unrecognized state fails closed.
+`--offline` is intentionally explicit and is not used by the Mainsail button.
+
+The updater clones into a staging directory, validates the release checksum
+manifest, deploys the four extras, Moonraker component, configuration wiring,
+and version-matched Mainsail build, then swaps the source checkout last. User
+`klippertools.cfg` and Mainsail `config.json` are preserved. Moonraker's generic
+`git_repo` updater is not used because it cannot transactionally update these
+copied runtime files.
+
+Uninstall uses the recorded paths and original-existence flags, validates every
+path under the normal user's home, reverses only recorded changes, preserves
+the latest Mainsail `config.json`, archives the source checkout, and retains
+recovery material.
+
+`check-install.sh` treats the saved state as a manifest. It checks backend and
+Moonraker hashes plus Python syntax, both configuration includes, absence of a
+live transaction journal, the packaged UI archive hash, and every installed UI
+file except mutable `config.json`.
 
 The Probe Progress and Nozzle Guard hooks use Klipper private methods because
 Klipper currently exposes neither a public bed-mesh progress event nor a public

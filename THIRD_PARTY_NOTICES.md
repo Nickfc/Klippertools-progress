@@ -18,5 +18,12 @@ The Klipper integration targets Klipper, also licensed under GNU GPL version
 - Validated update commit: 7046bd00
 - Upstream project: https://github.com/Klipper3d/klipper
 
-Mainsail and Klipper are trademarks or project names of their respective
-authors. This project is not an official release of either upstream project.
+The lifecycle controller integrates with Moonraker's public component APIs.
+Moonraker is licensed under GNU GPL version 3.
+
+- Validated installed version: v0.10.0-29
+- Upstream project: https://github.com/Arksine/moonraker
+
+Mainsail, Klipper, and Moonraker are trademarks or project names of their
+respective authors. This project is not an official release of those upstream
+projects.

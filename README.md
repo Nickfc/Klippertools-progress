@@ -58,8 +58,9 @@ Klippertools card with Nozzle Guard, StartFlow, Maintenance, and Motion tabs.
 - Moonraker v0.10.0-29
 
 The installer accepts only the two listed Mainsail versions because the suite
-uses a version-matched native Mainsail build. A normal Mainsail update replaces
-the custom UI and requires a matching Klippertools build.
+uses a version-matched native Mainsail build. Use the Klippertools Update button
+for suite updates. A standalone Mainsail update replaces the custom UI and must
+be followed by a matching Klippertools update from SSH.
 
 ## Your supplied printer configuration
 
@@ -78,8 +79,7 @@ touches. Tolerance retries add touches only when needed.
 
 ## Online install
 
-Only install while the printer is idle. SSH into the CB1 as the normal Klipper
-user, then run:
+SSH into the CB1 as the normal Klipper user, then run:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Nickfc/Klippertools-progress/main/install-online.sh \
@@ -88,45 +88,80 @@ bash /tmp/install-klippertools.sh
 ```
 
 The bootstrap clones the public repository into `~/klippertools`, validates
-every packaged file against `SHA256SUMS`, and starts the transactional
-installer. It refuses root, an existing installation, a legacy Probe Progress
-install, or an unsupported Mainsail version before replacing anything.
+every packaged file against `SHA256SUMS`, and starts the journaled transactional
+installer. It refuses root, an active or paused print, an existing installation,
+a legacy Probe Progress install, or an unsupported Mainsail version before
+replacing anything.
 
 To install a tag or review branch instead of `main`:
 
 ```bash
-KLIPPERTOOLS_REF=v0.2.0 bash /tmp/install-klippertools.sh
+KLIPPERTOOLS_REF=v0.2.1 bash /tmp/install-klippertools.sh
 ```
 
 After installation:
 
-1. Send `RESTART` in the Mainsail console.
-2. Hard-refresh the browser with Ctrl+Shift+R.
-3. Confirm that Probe Progress and Klippertools appear under Console.
+1. Restart Moonraker from Mainsail's power menu or over SSH.
+2. Send `RESTART` in the Mainsail console.
+3. Hard-refresh the browser with Ctrl+Shift+R.
+4. Confirm that Probe Progress and Klippertools appear under Console.
 
 The installer retains complete rollback material under
-`~/klippertools-backups/`. It preserves `printer.cfg`, previous versions of all
-managed Klipper extras and `klippertools.cfg`, the original Mainsail build, and
-Mainsail's current `config.json`. Any failed install restores the originals.
+`~/klippertools-backups/`. Before the first mutation it writes and fsyncs a
+recovery journal outside the source checkout. It preserves `printer.cfg`,
+`moonraker.conf`, previous managed Klipper and Moonraker components,
+`klippertools.cfg`, the original Mainsail build, and Mainsail's current
+`config.json`. Ordinary failures roll back immediately; a power interruption is
+recovered with:
+
+```bash
+~/printer_data/klippertools-recovery/recover.sh
+```
+
+Recovery also verifies that the printer is idle. Use `--offline` only when
+Moonraker is unavailable and you have independently confirmed no print is
+active.
+
+## One-click updates
+
+After the first Moonraker restart, the cloud-download icon in the Klippertools
+card opens the updater. **Update now** performs one guarded operation:
+
+1. Moonraker proves the printer is neither printing nor paused.
+2. A new checkout of the configured repository branch is downloaded to a
+   staging directory.
+3. Every release file is checked against `SHA256SUMS`.
+4. Klipper, Moonraker, and the matching Mainsail build are updated under one
+   persistent rollback journal; `klippertools.cfg` and Mainsail `config.json`
+   are preserved.
+5. The source checkout is swapped last, then Klipper and Moonraker restart.
+
+The POST endpoint is exposed through Moonraker's authenticated API, rejects
+concurrent updates, and launches the updater without a shell. If the UI is not
+available, the identical path can be run over SSH:
+
+```bash
+~/klippertools/scripts/update-online.sh
+```
 
 ## Manual release ZIP
 
 Download
-[`klippertools-suite-0.2.0.zip`](dist/klippertools-suite-0.2.0.zip)
+[`klippertools-suite-0.2.1.zip`](dist/klippertools-suite-0.2.1.zip)
 (with its optional
-[`SHA-256 sidecar`](dist/klippertools-suite-0.2.0.zip.sha256)), upload the ZIP
+[`SHA-256 sidecar`](dist/klippertools-suite-0.2.1.zip.sha256)), upload the ZIP
 under Mainsail's Config Files, then SSH into the CB1 as the normal Klipper
 user:
 
 ```bash
 mkdir -p ~/klippertools
-unzip -q ~/printer_data/config/klippertools-suite-0.2.0.zip -d ~/klippertools
+unzip -q ~/printer_data/config/klippertools-suite-0.2.1.zip -d ~/klippertools
 cd ~/klippertools
 sha256sum -c SHA256SUMS
 ./scripts/install.sh
 ```
 
-Then send `RESTART` and hard-refresh the browser as above.
+Then restart Moonraker, send `RESTART`, and hard-refresh the browser as above.
 
 ## Safe first checks
 
@@ -185,24 +220,27 @@ or temporarily rewrite that safety-critical setting.
 
 ## Verify or uninstall
 
-Verify installed files at any time:
+Verify installed files at any time. This checks saved hashes, Python syntax,
+configuration wiring, the transaction journal, and every deployed Mainsail
+asset rather than merely testing whether filenames exist:
 
 ```bash
 cd ~/klippertools
 ./scripts/check-install.sh
 ```
 
-Uninstall only while idle:
+Uninstall is blocked automatically while printing or paused:
 
 ```bash
 cd ~/klippertools
 ./scripts/uninstall.sh
 ```
 
-Then send `RESTART` and hard-refresh the browser. Uninstall removes only the
-include and StartFlow markers it added, restores previous managed files and the
-original Mainsail build, preserves the latest Mainsail settings, and retains
-recovery files.
+Then restart Moonraker and Klipper and hard-refresh the browser. Uninstall
+removes only owned marker blocks, restores previous managed files and the
+original Mainsail build, preserves the latest Mainsail settings, archives the
+source checkout, and retains recovery material. Because `~/klippertools` is no
+longer left active, the online installer can be used again cleanly.
 
 ## Development
 

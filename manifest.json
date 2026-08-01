@@ -1,6 +1,6 @@
 {
   "name": "klippertools-suite",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "released": "2026-08-01",
   "repository": "https://github.com/Nickfc/Klippertools-progress",
   "klipper_tested": [
@@ -16,7 +16,8 @@
     "nozzle-guard",
     "start-flow",
     "maintenance-tracker",
-    "motion-wizard"
+    "motion-wizard",
+    "transactional-updater"
   ],
   "default_eta_seed_points": 3,
   "supported_probe_method": "automatic",
