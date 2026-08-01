@@ -1,9 +1,9 @@
 diff --git a/src/components/klippertools/MaintenanceTrackerTool.vue b/src/components/klippertools/MaintenanceTrackerTool.vue
 new file mode 100644
-index 0000000..0cd734c
+index 0000000..8029e86
 --- /dev/null
 +++ b/src/components/klippertools/MaintenanceTrackerTool.vue
-@@ -0,0 +1,156 @@
+@@ -0,0 +1,176 @@
 +<template>
 +    <div class="pa-4">
 +        <div class="d-flex justify-end mb-2">
@@ -17,7 +17,8 @@ index 0000000..0cd734c
 +            <v-list-item
 +                v-for="entry in activeEntries"
 +                :key="entry.id"
-+                class="maintenance-entry px-0"
++                class="maintenance-entry px-3"
++                :class="{ 'maintenance-entry--due': entryProgress(entry) >= 100 }"
 +                @click="openDetails(entry)">
 +                <v-list-item-content>
 +                    <div class="d-flex justify-space-between mb-1">
@@ -157,15 +158,34 @@ index 0000000..0cd734c
 +
 +<style scoped>
 +.maintenance-entry {
++    border: 1px solid rgba(127, 127, 127, 0.16);
++    border-radius: 8px;
 +    cursor: pointer;
++    margin-bottom: 7px;
++    background: rgba(127, 127, 127, 0.045);
++    transition:
++        background-color 150ms ease,
++        border-color 150ms ease,
++        transform 150ms ease;
++}
++
++.maintenance-entry:hover {
++    border-color: rgba(33, 150, 243, 0.36);
++    background: rgba(33, 150, 243, 0.07);
++    transform: translateY(-1px);
++}
++
++.maintenance-entry--due {
++    border-color: rgba(244, 67, 54, 0.36);
++    background: rgba(244, 67, 54, 0.065);
 +}
 +</style>
 diff --git a/src/components/klippertools/MotionWizardTool.vue b/src/components/klippertools/MotionWizardTool.vue
 new file mode 100644
-index 0000000..86298bb
+index 0000000..5874776
 --- /dev/null
 +++ b/src/components/klippertools/MotionWizardTool.vue
-@@ -0,0 +1,204 @@
+@@ -0,0 +1,234 @@
 +<template>
 +    <div class="pa-4">
 +        <v-alert dense text type="warning" class="mb-4">
@@ -174,7 +194,7 @@ index 0000000..86298bb
 +
 +        <v-progress-linear :value="status ? status.progress : 0" color="primary" height="8" rounded class="mb-4" />
 +
-+        <div class="motion-step mb-3">
++        <div class="motion-step mb-3" :class="{ 'motion-step--done': allHomed }">
 +            <div class="motion-step__number">1</div>
 +            <div class="motion-step__content">
 +                <div class="font-weight-medium">{{ $t('Panels.KlippertoolsPanel.Motion.HomeTitle') }}</div>
@@ -186,7 +206,7 @@ index 0000000..86298bb
 +            </v-btn>
 +        </div>
 +
-+        <div class="motion-step mb-3">
++        <div class="motion-step mb-3" :class="{ 'motion-step--done': status && status.noise_complete }">
 +            <div class="motion-step__number">2</div>
 +            <div class="motion-step__content">
 +                <div class="font-weight-medium">{{ $t('Panels.KlippertoolsPanel.Motion.NoiseTitle') }}</div>
@@ -198,7 +218,7 @@ index 0000000..86298bb
 +            </v-btn>
 +        </div>
 +
-+        <div class="motion-step mb-4">
++        <div class="motion-step mb-4" :class="{ 'motion-step--done': canSave }">
 +            <div class="motion-step__number">3</div>
 +            <div class="motion-step__content">
 +                <div class="font-weight-medium">{{ $t('Panels.KlippertoolsPanel.Motion.CalibrateTitle') }}</div>
@@ -214,7 +234,7 @@ index 0000000..86298bb
 +
 +        <v-row dense class="mb-2">
 +            <v-col v-for="axis in ['x', 'y']" :key="axis" cols="6">
-+                <v-card outlined class="pa-3">
++                <v-card outlined class="motion-result-card pa-3" :class="{ 'motion-result-card--ready': result(axis) }">
 +                    <div class="text-caption text--secondary">{{ axis.toUpperCase() }}</div>
 +                    <template v-if="result(axis)">
 +                        <div class="font-weight-medium">{{ result(axis).type }}</div>
@@ -348,8 +368,20 @@ index 0000000..86298bb
 +<style scoped>
 +.motion-step {
 +    align-items: center;
++    border: 1px solid rgba(127, 127, 127, 0.16);
++    border-radius: 8px;
 +    display: flex;
 +    gap: 12px;
++    padding: 9px 10px;
++    background: rgba(127, 127, 127, 0.045);
++    transition:
++        background-color 160ms ease,
++        border-color 160ms ease;
++}
++
++.motion-step--done {
++    border-color: rgba(76, 175, 80, 0.3);
++    background: rgba(76, 175, 80, 0.055);
 +}
 +
 +.motion-step__number {
@@ -369,13 +401,31 @@ index 0000000..86298bb
 +    flex: 1 1 auto;
 +    min-width: 0;
 +}
++
++.motion-step--done .motion-step__number {
++    background: rgba(76, 175, 80, 0.16);
++    color: #66bb6a;
++}
++
++.motion-result-card {
++    min-height: 92px;
++    background: rgba(127, 127, 127, 0.035) !important;
++    transition:
++        background-color 160ms ease,
++        border-color 160ms ease;
++}
++
++.motion-result-card--ready {
++    border-color: rgba(33, 150, 243, 0.34) !important;
++    background: rgba(33, 150, 243, 0.06) !important;
++}
 +</style>
 diff --git a/src/components/klippertools/NozzleGuardTool.vue b/src/components/klippertools/NozzleGuardTool.vue
 new file mode 100644
-index 0000000..9a726c0
+index 0000000..b9750aa
 --- /dev/null
 +++ b/src/components/klippertools/NozzleGuardTool.vue
-@@ -0,0 +1,146 @@
+@@ -0,0 +1,206 @@
 +<template>
 +    <div class="pa-4">
 +        <v-alert dense text :type="alertType" class="mb-4">
@@ -383,22 +433,24 @@ index 0000000..9a726c0
 +        </v-alert>
 +
 +        <div v-if="status" class="klippertools-comparison mb-3">
-+            <div>
++            <div class="nozzle-card">
 +                <div class="text-caption text--secondary">
 +                    {{ $t('Panels.KlippertoolsPanel.NozzleGuard.KlipperNozzle') }}
 +                </div>
-+                <div class="text-h5">{{ formatNozzle(status.configured_nozzle) }}</div>
++                <div class="nozzle-card__value">{{ formatNozzle(status.configured_nozzle) }}</div>
 +            </div>
-+            <v-icon :color="comparisonColor">{{ comparisonIcon }}</v-icon>
-+            <div class="text-right">
++            <div class="nozzle-comparison-icon" :class="'nozzle-comparison-icon--' + alertType">
++                <v-icon :color="comparisonColor">{{ comparisonIcon }}</v-icon>
++            </div>
++            <div class="nozzle-card text-right" :class="'nozzle-card--' + alertType">
 +                <div class="text-caption text--secondary">
 +                    {{ $t('Panels.KlippertoolsPanel.NozzleGuard.FileNozzle') }}
 +                </div>
-+                <div class="text-h5">{{ detectedNozzleText }}</div>
++                <div class="nozzle-card__value">{{ detectedNozzleText }}</div>
 +            </div>
 +        </div>
 +
-+        <div v-if="status && status.filename" class="text-caption text--secondary text-truncate mb-3">
++        <div v-if="status && status.filename" class="nozzle-filename text-caption text--secondary text-truncate mb-3">
 +            {{ status.filename }}
 +        </div>
 +
@@ -515,7 +567,65 @@ index 0000000..9a726c0
 +    align-items: center;
 +    display: grid;
 +    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-+    gap: 16px;
++    gap: 10px;
++}
++
++.nozzle-card {
++    border: 1px solid rgba(127, 127, 127, 0.2);
++    border-radius: 8px;
++    min-width: 0;
++    padding: 11px 12px;
++    background: rgba(127, 127, 127, 0.06);
++}
++
++.nozzle-card--success {
++    border-color: rgba(76, 175, 80, 0.34);
++    background: rgba(76, 175, 80, 0.07);
++}
++
++.nozzle-card--warning {
++    border-color: rgba(255, 193, 7, 0.34);
++    background: rgba(255, 193, 7, 0.07);
++}
++
++.nozzle-card--error {
++    border-color: rgba(244, 67, 54, 0.4);
++    background: rgba(244, 67, 54, 0.08);
++}
++
++.nozzle-card__value {
++    font-size: 1.35rem;
++    font-variant-numeric: tabular-nums;
++    font-weight: 600;
++    line-height: 1.35;
++    margin-top: 2px;
++    white-space: nowrap;
++}
++
++.nozzle-comparison-icon {
++    align-items: center;
++    border: 1px solid rgba(127, 127, 127, 0.22);
++    border-radius: 50%;
++    display: flex;
++    height: 34px;
++    justify-content: center;
++    width: 34px;
++    background: rgba(127, 127, 127, 0.08);
++}
++
++.nozzle-comparison-icon--success {
++    border-color: rgba(76, 175, 80, 0.34);
++}
++
++.nozzle-comparison-icon--warning,
++.nozzle-comparison-icon--error {
++    border-color: rgba(244, 67, 54, 0.34);
++}
++
++.nozzle-filename {
++    border-radius: 5px;
++    padding: 5px 8px;
++    background: rgba(127, 127, 127, 0.06);
 +}
 +
 +.ga-2 {
@@ -524,10 +634,10 @@ index 0000000..9a726c0
 +</style>
 diff --git a/src/components/klippertools/StartFlowTool.vue b/src/components/klippertools/StartFlowTool.vue
 new file mode 100644
-index 0000000..bb0b01d
+index 0000000..db788cb
 --- /dev/null
 +++ b/src/components/klippertools/StartFlowTool.vue
-@@ -0,0 +1,123 @@
+@@ -0,0 +1,175 @@
 +<template>
 +    <div class="pa-4">
 +        <template v-if="status && status.stages.length">
@@ -537,15 +647,21 @@ index 0000000..bb0b01d
 +            </div>
 +            <v-progress-linear :value="status.progress" :color="progressColor" height="10" rounded class="mb-3" />
 +
-+            <v-list dense class="transparent pa-0">
-+                <v-list-item v-for="stage in status.stages" :key="stage.name" class="px-0">
-+                    <v-list-item-icon class="mr-3">
++            <v-list dense class="start-flow-list transparent pa-0">
++                <v-list-item
++                    v-for="stage in status.stages"
++                    :key="stage.name"
++                    class="start-flow-stage px-0"
++                    :class="'start-flow-stage--' + stage.state">
++                    <v-list-item-icon class="start-flow-stage__icon mr-3">
 +                        <v-icon :color="stageColor(stage)" small>{{ stageIcon(stage) }}</v-icon>
 +                    </v-list-item-icon>
 +                    <v-list-item-content>
 +                        <v-list-item-title>{{ stageLabel(stage) }}</v-list-item-title>
 +                    </v-list-item-content>
-+                    <v-list-item-action-text>{{ stageTime(stage) }}</v-list-item-action-text>
++                    <v-list-item-action-text class="start-flow-stage__time">
++                        {{ stageTime(stage) }}
++                    </v-list-item-action-text>
 +                </v-list-item>
 +            </v-list>
 +        </template>
@@ -651,6 +767,52 @@ index 0000000..bb0b01d
 +    }
 +}
 +</script>
++
++<style scoped>
++.start-flow-list {
++    position: relative;
++}
++
++.start-flow-stage {
++    border-radius: 7px;
++    margin-bottom: 3px;
++    min-height: 42px;
++    padding-right: 8px !important;
++    transition: background-color 160ms ease;
++}
++
++.start-flow-stage--active {
++    background: rgba(255, 193, 7, 0.09);
++}
++
++.start-flow-stage--done {
++    background: rgba(76, 175, 80, 0.035);
++}
++
++.start-flow-stage--error {
++    background: rgba(244, 67, 54, 0.09);
++}
++
++.start-flow-stage__icon {
++    align-items: center;
++    border: 1px solid rgba(127, 127, 127, 0.2);
++    border-radius: 50%;
++    height: 28px;
++    justify-content: center;
++    margin-bottom: 7px !important;
++    margin-top: 7px !important;
++    min-width: 28px;
++    width: 28px;
++    background: rgba(127, 127, 127, 0.08);
++}
++
++.start-flow-stage__time {
++    border-radius: 10px;
++    font-variant-numeric: tabular-nums;
++    padding: 2px 7px;
++    background: rgba(127, 127, 127, 0.08);
++}
++</style>
 diff --git a/src/components/klippertools/types.ts b/src/components/klippertools/types.ts
 new file mode 100644
 index 0000000..12a7645
@@ -720,25 +882,46 @@ index 0000000..12a7645
 +    results: Record<string, MotionWizardResult>
 +}
 diff --git a/src/components/mixins/dashboard.ts b/src/components/mixins/dashboard.ts
-index 7da3685..08299b1 100644
+index 7da3685..dc51ab9 100644
 --- a/src/components/mixins/dashboard.ts
 +++ b/src/components/mixins/dashboard.ts
-@@ -10,12 +10,14 @@ import {
+@@ -10,12 +10,18 @@ import {
      mdiEngine,
      mdiGamepad,
      mdiInformation,
 +    mdiGrid,
      mdiLedStrip,
      mdiPrinter3dNozzle,
++    mdiProgressClock,
++    mdiShieldCheckOutline,
      mdiThermometerLines,
++    mdiTuneVariant,
      mdiWebcam,
++    mdiWrenchClock,
      mdiAdjust,
      mdiMulticast,
 +    mdiToolboxOutline,
  } from '@mdi/js'
  import { afcIconLogo } from '@/plugins/afcIcons'
  
-@@ -69,6 +71,10 @@ export default class DashboardMixin extends BaseMixin {
+@@ -37,6 +43,16 @@ export default class DashboardMixin extends BaseMixin {
+             return group ? group.name : 'Macrogroup'
+         }
+ 
++        const klippertoolsLabels: Record<string, string> = {
++            'nozzle-guard': 'Guard',
++            'start-flow': 'Start',
++            'maintenance-tracker': 'Maintenance',
++            'motion-wizard': 'Motion',
++        }
++        if (name in klippertoolsLabels) {
++            return this.$t(`Panels.KlippertoolsPanel.Tabs.${klippertoolsLabels[name]}`)
++        }
++
+         if (name.includes('-')) {
+             let panelName = ''
+             const subStrings = name.split('-')
+@@ -69,6 +85,18 @@ export default class DashboardMixin extends BaseMixin {
                  return mdiThermometerLines
              case 'miniconsole':
                  return mdiConsoleLine
@@ -746,15 +929,23 @@ index 7da3685..08299b1 100644
 +                return mdiGrid
 +            case 'klippertools':
 +                return mdiToolboxOutline
++            case 'nozzle-guard':
++                return mdiShieldCheckOutline
++            case 'start-flow':
++                return mdiProgressClock
++            case 'maintenance-tracker':
++                return mdiWrenchClock
++            case 'motion-wizard':
++                return mdiTuneVariant
              case 'machine-settings':
                  return mdiEngine
              case 'extruder-control':
 diff --git a/src/components/panels/KlippertoolsPanel.vue b/src/components/panels/KlippertoolsPanel.vue
 new file mode 100644
-index 0000000..926b82a
+index 0000000..3cb92e0
 --- /dev/null
 +++ b/src/components/panels/KlippertoolsPanel.vue
-@@ -0,0 +1,247 @@
+@@ -0,0 +1,339 @@
 +<template>
 +    <panel
 +        v-if="socketIsConnected && klipperState !== 'disconnected' && available"
@@ -767,46 +958,47 @@ index 0000000..926b82a
 +            <v-chip v-if="attentionCount" x-small color="error" outlined class="ml-2">
 +                {{ $t('Panels.KlippertoolsPanel.Attention', { count: attentionCount }) }}
 +            </v-chip>
-+            <v-btn
-+                v-if="updaterAvailable"
-+                icon
-+                small
-+                class="ml-1"
-+                :loading="updateStatus.updating"
-+                :disabled="printerIsPrinting"
-+                :aria-label="$t('Panels.KlippertoolsPanel.Update.Title')"
-+                @click.stop="openUpdateDialog">
-+                <v-icon small>{{ mdiCloudDownloadOutline }}</v-icon>
-+            </v-btn>
 +        </template>
 +
-+        <v-tabs v-model="tab" grow show-arrows background-color="transparent" color="primary">
-+            <v-tab :aria-label="$t('Panels.KlippertoolsPanel.Tabs.Guard')">
-+                <v-icon small class="mr-1">{{ mdiShieldCheckOutline }}</v-icon>
-+                <span class="klippertools-tab-label">{{ $t('Panels.KlippertoolsPanel.Tabs.Guard') }}</span>
-+            </v-tab>
-+            <v-tab :aria-label="$t('Panels.KlippertoolsPanel.Tabs.Start')">
-+                <v-icon small class="mr-1">{{ mdiProgressClock }}</v-icon>
-+                <span class="klippertools-tab-label">{{ $t('Panels.KlippertoolsPanel.Tabs.Start') }}</span>
-+            </v-tab>
-+            <v-tab :aria-label="$t('Panels.KlippertoolsPanel.Tabs.Maintenance')">
-+                <v-icon small class="mr-1">{{ mdiWrenchClock }}</v-icon>
-+                <span class="klippertools-tab-label">{{ $t('Panels.KlippertoolsPanel.Tabs.Maintenance') }}</span>
-+            </v-tab>
-+            <v-tab :aria-label="$t('Panels.KlippertoolsPanel.Tabs.Motion')">
-+                <v-icon small class="mr-1">{{ mdiTuneVariant }}</v-icon>
-+                <span class="klippertools-tab-label">{{ $t('Panels.KlippertoolsPanel.Tabs.Motion') }}</span>
-+            </v-tab>
-+        </v-tabs>
++        <v-card-text class="klippertools-core">
++            <div class="klippertools-core__identity">
++                <div class="klippertools-core__mark">
++                    <v-icon color="primary">{{ mdiToolboxOutline }}</v-icon>
++                </div>
++                <div class="flex-grow-1">
++                    <div class="font-weight-medium">{{ $t('Panels.KlippertoolsPanel.Headline') }}</div>
++                    <div class="text-caption text--secondary">
++                        {{ $t('Panels.KlippertoolsPanel.Update.Installed', { version: installedVersion }) }}
++                    </div>
++                </div>
++                <v-chip x-small outlined color="success">{{ enabledToolCount }} / 4</v-chip>
++            </div>
 +
-+        <v-divider />
++            <div class="klippertools-core__tools">
++                <div
++                    v-for="tool in toolStatuses"
++                    :key="tool.key"
++                    class="klippertools-core__tool"
++                    :class="{ 'klippertools-core__tool--available': tool.available }">
++                    <v-icon small>{{ tool.icon }}</v-icon>
++                    <span>{{ tool.label }}</span>
++                    <i />
++                </div>
++            </div>
 +
-+        <v-tabs-items v-model="tab" class="transparent">
-+            <v-tab-item><nozzle-guard-tool /></v-tab-item>
-+            <v-tab-item><start-flow-tool /></v-tab-item>
-+            <v-tab-item><maintenance-tracker-tool /></v-tab-item>
-+            <v-tab-item><motion-wizard-tool /></v-tab-item>
-+        </v-tabs-items>
++            <v-btn
++                v-if="updaterAvailable"
++                block
++                small
++                outlined
++                color="primary"
++                :loading="updateStatus.updating"
++                :disabled="printerIsPrinting"
++                @click="openUpdateDialog">
++                <v-icon small left>{{ mdiCloudDownloadOutline }}</v-icon>
++                {{ $t('Panels.KlippertoolsPanel.Update.Action') }}
++            </v-btn>
++        </v-card-text>
 +
 +        <v-dialog v-model="showUpdateDialog" max-width="520">
 +            <v-card>
@@ -856,10 +1048,6 @@ index 0000000..926b82a
 +import { Component, Mixins } from 'vue-property-decorator'
 +import BaseMixin from '@/components/mixins/base'
 +import Panel from '@/components/ui/Panel.vue'
-+import MaintenanceTrackerTool from '@/components/klippertools/MaintenanceTrackerTool.vue'
-+import MotionWizardTool from '@/components/klippertools/MotionWizardTool.vue'
-+import NozzleGuardTool from '@/components/klippertools/NozzleGuardTool.vue'
-+import StartFlowTool from '@/components/klippertools/StartFlowTool.vue'
 +import {
 +    mdiCloudDownloadOutline,
 +    mdiProgressClock,
@@ -877,13 +1065,16 @@ index 0000000..926b82a
 +    restart_required?: boolean
 +}
 +
++interface ToolStatus {
++    key: string
++    label: string
++    icon: string
++    available: boolean
++}
++
 +@Component({
 +    components: {
-+        MaintenanceTrackerTool,
-+        MotionWizardTool,
-+        NozzleGuardTool,
 +        Panel,
-+        StartFlowTool,
 +    },
 +})
 +export default class KlippertoolsPanel extends Mixins(BaseMixin) {
@@ -894,7 +1085,6 @@ index 0000000..926b82a
 +    mdiTuneVariant = mdiTuneVariant
 +    mdiWrenchClock = mdiWrenchClock
 +
-+    tab = 0
 +    showUpdateDialog = false
 +    updateTimer: number | null = null
 +    updateStatus: UpdateStatus = {
@@ -932,6 +1122,39 @@ index 0000000..926b82a
 +
 +    get installedVersion(): string {
 +        return this.updateStatus.installed_version || 'unknown'
++    }
++
++    get toolStatuses(): ToolStatus[] {
++        return [
++            {
++                key: 'guard',
++                label: String(this.$t('Panels.KlippertoolsPanel.Tabs.Guard')),
++                icon: mdiShieldCheckOutline,
++                available: Boolean(this.$store.state.printer?.nozzle_guard),
++            },
++            {
++                key: 'start',
++                label: String(this.$t('Panels.KlippertoolsPanel.Tabs.Start')),
++                icon: mdiProgressClock,
++                available: Boolean(this.$store.state.printer?.start_flow),
++            },
++            {
++                key: 'maintenance',
++                label: String(this.$t('Panels.KlippertoolsPanel.Tabs.Maintenance')),
++                icon: mdiWrenchClock,
++                available: this.available,
++            },
++            {
++                key: 'motion',
++                label: String(this.$t('Panels.KlippertoolsPanel.Tabs.Motion')),
++                icon: mdiTuneVariant,
++                available: Boolean(this.$store.state.printer?.motion_wizard),
++            },
++        ]
++    }
++
++    get enabledToolCount(): number {
++        return this.toolStatuses.filter((tool) => tool.available).length
 +    }
 +
 +    async openUpdateDialog(): Promise<void> {
@@ -996,18 +1219,193 @@ index 0000000..926b82a
 +</script>
 +
 +<style scoped>
-+@media (max-width: 520px) {
-+    .klippertools-tab-label {
-+        display: none;
-+    }
++.klippertools-core {
++    padding: 14px 16px 16px;
++}
++
++.klippertools-core__identity {
++    align-items: center;
++    display: flex;
++    gap: 11px;
++    margin-bottom: 12px;
++}
++
++.klippertools-core__mark {
++    align-items: center;
++    border: 1px solid rgba(33, 150, 243, 0.28);
++    border-radius: 9px;
++    display: flex;
++    height: 40px;
++    justify-content: center;
++    width: 40px;
++    background: rgba(33, 150, 243, 0.09);
++}
++
++.klippertools-core__tools {
++    display: grid;
++    grid-template-columns: repeat(2, minmax(0, 1fr));
++    gap: 7px;
++    margin-bottom: 12px;
++}
++
++.klippertools-core__tool {
++    align-items: center;
++    border: 1px solid rgba(127, 127, 127, 0.14);
++    border-radius: 7px;
++    color: rgba(127, 127, 127, 0.82);
++    display: grid;
++    font-size: 0.72rem;
++    gap: 7px;
++    grid-template-columns: auto minmax(0, 1fr) auto;
++    min-width: 0;
++    padding: 7px 8px;
++    background: rgba(127, 127, 127, 0.035);
++}
++
++.klippertools-core__tool span {
++    overflow: hidden;
++    text-overflow: ellipsis;
++    white-space: nowrap;
++}
++
++.klippertools-core__tool i {
++    border-radius: 50%;
++    height: 7px;
++    width: 7px;
++    background: rgba(127, 127, 127, 0.45);
++}
++
++.klippertools-core__tool--available {
++    border-color: rgba(76, 175, 80, 0.22);
++    color: inherit;
++    background: rgba(76, 175, 80, 0.045);
++}
++
++.klippertools-core__tool--available i {
++    background: #66bb6a;
 +}
 +</style>
+diff --git a/src/components/panels/MaintenanceTrackerPanel.vue b/src/components/panels/MaintenanceTrackerPanel.vue
+new file mode 100644
+index 0000000..292b62b
+--- /dev/null
++++ b/src/components/panels/MaintenanceTrackerPanel.vue
+@@ -0,0 +1,41 @@
++<template>
++    <panel
++        v-if="socketIsConnected && klipperState !== 'disconnected' && available"
++        :icon="mdiWrenchClock"
++        :title="$t('Panels.KlippertoolsPanel.Tabs.Maintenance')"
++        :collapsible="true"
++        card-class="maintenance-tracker-panel"
++        :hide-buttons-on-collapse="true">
++        <template #buttons-title>
++            <v-chip v-if="overdueCount" x-small color="error" outlined class="ml-2">
++                {{ overdueCount }}
++            </v-chip>
++        </template>
++        <maintenance-tracker-tool />
++    </panel>
++</template>
++
++<script lang="ts">
++import { Component, Mixins } from 'vue-property-decorator'
++import BaseMixin from '@/components/mixins/base'
++import MaintenanceTrackerTool from '@/components/klippertools/MaintenanceTrackerTool.vue'
++import Panel from '@/components/ui/Panel.vue'
++import { mdiWrenchClock } from '@mdi/js'
++
++@Component({ components: { MaintenanceTrackerTool, Panel } })
++export default class MaintenanceTrackerPanel extends Mixins(BaseMixin) {
++    mdiWrenchClock = mdiWrenchClock
++
++    get available(): boolean {
++        return Boolean(
++            this.$store.state.printer?.nozzle_guard ||
++            this.$store.state.printer?.start_flow ||
++            this.$store.state.printer?.motion_wizard
++        )
++    }
++
++    get overdueCount(): number {
++        return this.$store.getters['gui/maintenance/getOverdueEntries']?.length ?? 0
++    }
++}
++</script>
+diff --git a/src/components/panels/MotionWizardPanel.vue b/src/components/panels/MotionWizardPanel.vue
+new file mode 100644
+index 0000000..936c959
+--- /dev/null
++++ b/src/components/panels/MotionWizardPanel.vue
+@@ -0,0 +1,28 @@
++<template>
++    <panel
++        v-if="socketIsConnected && klipperState !== 'disconnected' && available"
++        :icon="mdiTuneVariant"
++        :title="$t('Panels.KlippertoolsPanel.Tabs.Motion')"
++        :collapsible="true"
++        card-class="motion-wizard-panel"
++        :hide-buttons-on-collapse="true">
++        <motion-wizard-tool />
++    </panel>
++</template>
++
++<script lang="ts">
++import { Component, Mixins } from 'vue-property-decorator'
++import BaseMixin from '@/components/mixins/base'
++import MotionWizardTool from '@/components/klippertools/MotionWizardTool.vue'
++import Panel from '@/components/ui/Panel.vue'
++import { mdiTuneVariant } from '@mdi/js'
++
++@Component({ components: { MotionWizardTool, Panel } })
++export default class MotionWizardPanel extends Mixins(BaseMixin) {
++    mdiTuneVariant = mdiTuneVariant
++
++    get available(): boolean {
++        return Boolean(this.$store.state.printer?.motion_wizard)
++    }
++}
++</script>
+diff --git a/src/components/panels/NozzleGuardPanel.vue b/src/components/panels/NozzleGuardPanel.vue
+new file mode 100644
+index 0000000..d2ad1ab
+--- /dev/null
++++ b/src/components/panels/NozzleGuardPanel.vue
+@@ -0,0 +1,28 @@
++<template>
++    <panel
++        v-if="socketIsConnected && klipperState !== 'disconnected' && available"
++        :icon="mdiShieldCheckOutline"
++        :title="$t('Panels.KlippertoolsPanel.Tabs.Guard')"
++        :collapsible="true"
++        card-class="nozzle-guard-panel"
++        :hide-buttons-on-collapse="true">
++        <nozzle-guard-tool />
++    </panel>
++</template>
++
++<script lang="ts">
++import { Component, Mixins } from 'vue-property-decorator'
++import BaseMixin from '@/components/mixins/base'
++import NozzleGuardTool from '@/components/klippertools/NozzleGuardTool.vue'
++import Panel from '@/components/ui/Panel.vue'
++import { mdiShieldCheckOutline } from '@mdi/js'
++
++@Component({ components: { NozzleGuardTool, Panel } })
++export default class NozzleGuardPanel extends Mixins(BaseMixin) {
++    mdiShieldCheckOutline = mdiShieldCheckOutline
++
++    get available(): boolean {
++        return Boolean(this.$store.state.printer?.nozzle_guard)
++    }
++}
++</script>
 diff --git a/src/components/panels/ProbeProgressPanel.vue b/src/components/panels/ProbeProgressPanel.vue
 new file mode 100644
-index 0000000..9426011
+index 0000000..7110a33
 --- /dev/null
 +++ b/src/components/panels/ProbeProgressPanel.vue
-@@ -0,0 +1,374 @@
+@@ -0,0 +1,522 @@
 +<template>
 +    <panel
 +        v-if="socketIsConnected && klipperState !== 'disconnected' && probeProgress"
@@ -1026,40 +1424,56 @@ index 0000000..9426011
 +        <v-card-text class="probe-progress-content">
 +            <template v-if="hasMatrix">
 +                <div class="probe-progress-details">
-+                    <span>{{ primaryStatus }}</span>
-+                    <span v-if="secondaryStatus">{{ secondaryStatus }}</span>
++                    <span class="probe-progress-status">
++                        <span class="probe-progress-status__dot" :class="'probe-progress-status__dot--' + visualState" />
++                        {{ primaryStatus }}
++                    </span>
++                    <v-chip v-if="secondaryStatus" x-small outlined class="probe-progress-sample">
++                        {{ secondaryStatus }}
++                    </v-chip>
 +                </div>
 +
-+                <div
-+                    class="probe-progress-matrix"
-+                    role="grid"
-+                    :aria-label="$t('Panels.ProbeProgressPanel.MatrixLabel')"
-+                    :style="matrixStyle">
-+                    <template v-for="(cell, slotIndex) in matrixSlots">
-+                        <div
-+                            v-if="cell"
-+                            :key="'cell-' + cell.index"
-+                            class="probe-progress-cell"
-+                            :class="'probe-progress-cell--' + cell.state"
-+                            role="gridcell"
-+                            :title="cellTitle(cell)"
-+                            :aria-label="cellTitle(cell)">
-+                            <span>{{ cell.index }}</span>
-+                        </div>
-+                        <div
-+                            v-else
-+                            :key="'empty-' + slotIndex"
-+                            class="probe-progress-cell probe-progress-cell--empty"
-+                            aria-hidden="true" />
-+                    </template>
++                <div class="probe-progress-plate">
++                    <span class="probe-progress-axis probe-progress-axis--y">Y</span>
++                    <div
++                        class="probe-progress-matrix"
++                        role="grid"
++                        :aria-label="$t('Panels.ProbeProgressPanel.MatrixLabel')"
++                        :style="matrixStyle">
++                        <template v-for="(cell, slotIndex) in matrixSlots">
++                            <div
++                                v-if="cell"
++                                :key="'cell-' + cell.index"
++                                class="probe-progress-cell"
++                                :class="'probe-progress-cell--' + cell.state"
++                                role="gridcell"
++                                :title="cellTitle(cell)"
++                                :aria-label="cellTitle(cell)">
++                                <span>{{ cell.index }}</span>
++                            </div>
++                            <div
++                                v-else
++                                :key="'empty-' + slotIndex"
++                                class="probe-progress-cell probe-progress-cell--empty"
++                                aria-hidden="true" />
++                        </template>
++                    </div>
++                    <span class="probe-progress-axis probe-progress-axis--x">X</span>
++                </div>
++
++                <div class="probe-progress-legend" aria-hidden="true">
++                    <span v-for="state in ['pending', 'active', 'done']" :key="state">
++                        <i :class="'probe-progress-legend__swatch--' + state" />
++                        {{ $t(`Panels.ProbeProgressPanel.States.${state}`) }}
++                    </span>
 +                </div>
 +
 +                <v-progress-linear
 +                    class="probe-progress-bar"
 +                    :value="progress"
 +                    :color="progressColor"
-+                    background-color="#8c2020"
-+                    height="24"
++                    background-color="grey darken-3"
++                    height="26"
 +                    rounded>
 +                    <strong>{{ progressBarText }}</strong>
 +                </v-progress-linear>
@@ -1178,9 +1592,12 @@ index 0000000..9426011
 +    get primaryStatus(): string {
 +        const status = this.probeProgress
 +        if (!status) return ''
-+        if (status.state === 'complete') return String(this.$t('Panels.ProbeProgressPanel.Complete'))
-+        if (status.state === 'error') return String(this.$t('Panels.ProbeProgressPanel.Stopped'))
-+        if (status.phase === 'zero_reference') return String(this.$t('Panels.ProbeProgressPanel.ZeroReference'))
++        if (status.state === 'complete')
++            return String(this.$t('Panels.ProbeProgressPanel.Complete'))
++        if (status.state === 'error')
++            return String(this.$t('Panels.ProbeProgressPanel.Stopped'))
++        if (status.phase === 'zero_reference')
++            return String(this.$t('Panels.ProbeProgressPanel.ZeroReference'))
 +        return this.currentPointLabel
 +    }
 +
@@ -1209,6 +1626,13 @@ index 0000000..9426011
 +        return '#43a047'
 +    }
 +
++    get visualState(): string {
++        if (this.probeProgress?.state === 'complete') return 'done'
++        if (this.probeProgress?.state === 'error') return 'error'
++        if (this.probeProgress?.active) return 'active'
++        return 'pending'
++    }
++
 +    get progressBarText(): string {
 +        const status = this.probeProgress
 +        if (!status) return ''
@@ -1221,7 +1645,8 @@ index 0000000..9426011
 +                })
 +            )}`
 +        }
-+        if (status.state === 'error') return `${percent} · ${String(this.$t('Panels.ProbeProgressPanel.Stopped'))}`
++        if (status.state === 'error')
++            return `${percent} · ${String(this.$t('Panels.ProbeProgressPanel.Stopped'))}`
 +        if (status.eta_state === 'available' && status.eta_seconds !== null) {
 +            return `${percent} · ${String(
 +                this.$t('Panels.ProbeProgressPanel.Remaining', {
@@ -1269,28 +1694,112 @@ index 0000000..9426011
 +}
 +
 +.probe-progress-content {
-+    padding: 16px;
++    padding: 14px 16px 16px;
 +}
 +
 +.probe-progress-details {
++    align-items: center;
 +    display: flex;
 +    justify-content: space-between;
 +    gap: 12px;
-+    margin-bottom: 10px;
-+    color: rgba(255, 255, 255, 0.72);
++    margin-bottom: 12px;
 +    font-size: 0.82rem;
++}
++
++.probe-progress-status {
++    align-items: center;
++    display: inline-flex;
++    font-weight: 600;
++    gap: 8px;
++}
++
++.probe-progress-status__dot {
++    border-radius: 50%;
++    display: inline-block;
++    height: 9px;
++    width: 9px;
++}
++
++.probe-progress-status__dot--pending {
++    background: #ef5350;
++}
++
++.probe-progress-status__dot--active {
++    background: #ffca28;
++    box-shadow: 0 0 0 4px rgba(255, 202, 40, 0.14);
++}
++
++.probe-progress-status__dot--done {
++    background: #66bb6a;
++}
++
++.probe-progress-status__dot--error {
++    background: var(--v-error-base);
++}
++
++.probe-progress-sample {
++    opacity: 0.82;
++}
++
++.probe-progress-plate {
++    position: relative;
++    width: 100%;
++    max-width: 440px;
++    margin: 0 auto 10px;
++    padding: 16px 16px 20px 22px;
++    border: 1px solid rgba(255, 255, 255, 0.1);
++    border-radius: 10px;
++    background:
++        radial-gradient(circle at 50% 35%, rgba(255, 255, 255, 0.05), transparent 62%),
++        rgba(0, 0, 0, 0.2);
++    box-shadow:
++        inset 0 1px 0 rgba(255, 255, 255, 0.05),
++        0 6px 18px rgba(0, 0, 0, 0.16);
++}
++
++.probe-progress-plate::before,
++.probe-progress-plate::after {
++    position: absolute;
++    border-radius: 50%;
++    background: rgba(127, 127, 127, 0.35);
++    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.45);
++    content: '';
++    height: 5px;
++    top: 7px;
++    width: 5px;
++}
++
++.probe-progress-plate::before {
++    left: 8px;
++}
++
++.probe-progress-plate::after {
++    right: 8px;
 +}
 +
 +.probe-progress-matrix {
 +    display: grid;
 +    gap: 6px;
-+    width: 100%;
-+    max-width: 440px;
-+    margin: 0 auto 14px;
-+    padding: 10px;
-+    border: 1px solid rgba(255, 255, 255, 0.1);
-+    border-radius: 6px;
-+    background: #151515;
++}
++
++.probe-progress-axis {
++    position: absolute;
++    color: rgba(127, 127, 127, 0.8);
++    font-size: 0.58rem;
++    font-weight: 800;
++    letter-spacing: 0.08em;
++}
++
++.probe-progress-axis--y {
++    left: 8px;
++    top: 50%;
++    transform: translateY(-50%) rotate(-90deg);
++}
++
++.probe-progress-axis--x {
++    bottom: 5px;
++    left: 50%;
++    transform: translateX(-50%);
 +}
 +
 +.probe-progress-cell {
@@ -1299,7 +1808,8 @@ index 0000000..9426011
 +    justify-content: center;
 +    min-width: 0;
 +    aspect-ratio: 1;
-+    border-radius: 4px;
++    border: 1px solid rgba(255, 255, 255, 0.08);
++    border-radius: 5px;
 +    color: rgba(255, 255, 255, 0.86);
 +    font-size: clamp(0.56rem, 1vw, 0.74rem);
 +    font-weight: 600;
@@ -1310,14 +1820,14 @@ index 0000000..9426011
 +}
 +
 +.probe-progress-cell--pending {
-+    background: #b3261e;
-+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
++    background: linear-gradient(145deg, #d43b32, #9f211b);
++    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
 +}
 +
 +.probe-progress-cell--active {
 +    z-index: 1;
 +    color: #201600;
-+    background: #f9a825;
++    background: linear-gradient(145deg, #ffd54f, #f39c12);
 +    box-shadow:
 +        0 0 0 2px rgba(255, 213, 79, 0.35),
 +        0 0 16px rgba(249, 168, 37, 0.5);
@@ -1326,18 +1836,54 @@ index 0000000..9426011
 +}
 +
 +.probe-progress-cell--done {
-+    background: #2e7d32;
-+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
++    background: linear-gradient(145deg, #43a047, #24762a);
++    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
 +}
 +
 +.probe-progress-cell--empty {
 +    visibility: hidden;
 +}
 +
++.probe-progress-legend {
++    align-items: center;
++    display: flex;
++    justify-content: center;
++    gap: 14px;
++    margin: 0 0 12px;
++    color: rgba(127, 127, 127, 0.95);
++    font-size: 0.68rem;
++}
++
++.probe-progress-legend span {
++    align-items: center;
++    display: inline-flex;
++    gap: 5px;
++}
++
++.probe-progress-legend i {
++    border-radius: 3px;
++    display: inline-block;
++    height: 8px;
++    width: 8px;
++}
++
++.probe-progress-legend__swatch--pending {
++    background: #c4352c;
++}
++
++.probe-progress-legend__swatch--active {
++    background: #ffca28;
++}
++
++.probe-progress-legend__swatch--done {
++    background: #43a047;
++}
++
 +.probe-progress-bar {
 +    color: white;
-+    font-size: 0.76rem;
++    font-size: 0.74rem;
 +    letter-spacing: 0.01em;
++    box-shadow: inset 0 0 0 1px rgba(127, 127, 127, 0.22);
 +}
 +
 +.probe-progress-error {
@@ -1382,6 +1928,40 @@ index 0000000..9426011
 +    }
 +}
 +</style>
+diff --git a/src/components/panels/StartFlowPanel.vue b/src/components/panels/StartFlowPanel.vue
+new file mode 100644
+index 0000000..436d042
+--- /dev/null
++++ b/src/components/panels/StartFlowPanel.vue
+@@ -0,0 +1,28 @@
++<template>
++    <panel
++        v-if="socketIsConnected && klipperState !== 'disconnected' && available"
++        :icon="mdiProgressClock"
++        :title="$t('Panels.KlippertoolsPanel.Tabs.Start')"
++        :collapsible="true"
++        card-class="start-flow-panel"
++        :hide-buttons-on-collapse="true">
++        <start-flow-tool />
++    </panel>
++</template>
++
++<script lang="ts">
++import { Component, Mixins } from 'vue-property-decorator'
++import BaseMixin from '@/components/mixins/base'
++import Panel from '@/components/ui/Panel.vue'
++import StartFlowTool from '@/components/klippertools/StartFlowTool.vue'
++import { mdiProgressClock } from '@mdi/js'
++
++@Component({ components: { Panel, StartFlowTool } })
++export default class StartFlowPanel extends Mixins(BaseMixin) {
++    mdiProgressClock = mdiProgressClock
++
++    get available(): boolean {
++        return Boolean(this.$store.state.printer?.start_flow)
++    }
++}
++</script>
 diff --git a/src/locales/da.json b/src/locales/da.json
 index 3595edc..9053ea2 100644
 --- a/src/locales/da.json
@@ -1631,32 +2211,40 @@ index a46e38b..c86a904 100644
              "ActiveSpool": "Active Spool",
              "ChangeSpool": "Change Spool",
 diff --git a/src/pages/Dashboard.vue b/src/pages/Dashboard.vue
-index 7327676..8d0b16e 100644
+index 7327676..3e8648b 100644
 --- a/src/pages/Dashboard.vue
 +++ b/src/pages/Dashboard.vue
-@@ -93,6 +93,8 @@ import MacrosPanel from '@/components/panels/MacrosPanel.vue'
+@@ -93,6 +93,12 @@ import MacrosPanel from '@/components/panels/MacrosPanel.vue'
  import MiniconsolePanel from '@/components/panels/MiniconsolePanel.vue'
  import MinSettingsPanel from '@/components/panels/MinSettingsPanel.vue'
  import MiscellaneousPanel from '@/components/panels/MiscellaneousPanel.vue'
 +import KlippertoolsPanel from '@/components/panels/KlippertoolsPanel.vue'
++import MaintenanceTrackerPanel from '@/components/panels/MaintenanceTrackerPanel.vue'
++import MotionWizardPanel from '@/components/panels/MotionWizardPanel.vue'
++import NozzleGuardPanel from '@/components/panels/NozzleGuardPanel.vue'
 +import ProbeProgressPanel from '@/components/panels/ProbeProgressPanel.vue'
++import StartFlowPanel from '@/components/panels/StartFlowPanel.vue'
  import SpoolmanPanel from '@/components/panels/SpoolmanPanel.vue'
  import MmuPanel from '@/components/panels/MmuPanel.vue'
  import StatusPanel from '@/components/panels/StatusPanel.vue'
-@@ -112,6 +114,8 @@ import WebcamPanel from '@/components/panels/WebcamPanel.vue'
+@@ -112,6 +118,12 @@ import WebcamPanel from '@/components/panels/WebcamPanel.vue'
          MiniconsolePanel,
          MinSettingsPanel,
          MiscellaneousPanel,
 +        KlippertoolsPanel,
++        MaintenanceTrackerPanel,
++        MotionWizardPanel,
++        NozzleGuardPanel,
 +        ProbeProgressPanel,
++        StartFlowPanel,
          SpoolmanPanel,
          MmuPanel,
          StatusPanel,
 diff --git a/src/store/gui/getters.ts b/src/store/gui/getters.ts
-index 2da2695..524a3a1 100644
+index 2da2695..a282534 100644
 --- a/src/store/gui/getters.ts
 +++ b/src/store/gui/getters.ts
-@@ -106,6 +106,18 @@ export const getters: GetterTree<GuiState, RootState> = {
+@@ -106,6 +106,24 @@ export const getters: GetterTree<GuiState, RootState> = {
              allPanels = allPanels.filter((name) => name !== 'led-effects')
          }
  
@@ -1669,33 +2257,57 @@ index 2da2695..524a3a1 100644
 +            rootState.printer?.nozzle_guard || rootState.printer?.start_flow || rootState.printer?.motion_wizard
 +        )
 +        if (!klippertoolsAvailable) {
-+            allPanels = allPanels.filter((name) => name !== 'klippertools')
++            allPanels = allPanels.filter((name) => !['klippertools', 'maintenance-tracker'].includes(name))
 +        }
++        if (!rootState.printer?.nozzle_guard)
++            allPanels = allPanels.filter((name) => name !== 'nozzle-guard')
++        if (!rootState.printer?.start_flow)
++            allPanels = allPanels.filter((name) => name !== 'start-flow')
++        if (!rootState.printer?.motion_wizard)
++            allPanels = allPanels.filter((name) => name !== 'motion-wizard')
 +
          return allPanels
      },
  
-@@ -123,6 +135,9 @@ export const getters: GetterTree<GuiState, RootState> = {
+@@ -123,6 +141,19 @@ export const getters: GetterTree<GuiState, RootState> = {
                  const missingPanels: GuiStateLayoutoption[] = []
  
                  allPossiblePanels.forEach((panelname: string) => {
 +                    // This panel is inserted beside the console below so an
 +                    // existing dashboard opens in the expected column.
-+                    if (['probe-progress', 'klippertools'].includes(panelname)) return
++                    if (
++                        [
++                            'probe-progress',
++                            'klippertools',
++                            'nozzle-guard',
++                            'start-flow',
++                            'maintenance-tracker',
++                            'motion-wizard',
++                        ].includes(panelname)
++                    )
++                        return
                      if (!allViewportPanels.find((panel) => panel.name === panelname))
                          missingPanels.push({
                              name: panelname,
-@@ -132,6 +147,22 @@ export const getters: GetterTree<GuiState, RootState> = {
+@@ -132,6 +163,30 @@ export const getters: GetterTree<GuiState, RootState> = {
                  panels = panels.concat(missingPanels)
              }
  
-+            const anchoredPanels = ['probe-progress', 'klippertools']
++            const anchoredPanels = [
++                'probe-progress',
++                'klippertools',
++                'nozzle-guard',
++                'start-flow',
++                'maintenance-tracker',
++                'motion-wizard',
++            ]
 +            const allViewportPanels = getters['getAllPanelsFromViewport'](viewport) as GuiStateLayoutoption[]
 +            anchoredPanels.forEach((panelName) => {
 +                if (!allPossiblePanels.includes(panelName)) return
 +                const alreadyPlaced = allViewportPanels.some((panel) => panel.name === panelName)
 +                if (alreadyPlaced) return
-+                const previousPanel = panelName === 'klippertools' ? 'probe-progress' : 'miniconsole'
++                const panelIndex = anchoredPanels.indexOf(panelName)
++                const previousPanel = panelIndex > 0 ? anchoredPanels[panelIndex - 1] : 'miniconsole'
 +                let anchorIndex = panels.findIndex((panel) => panel.name === previousPanel)
 +                if (anchorIndex === -1) anchorIndex = panels.findIndex((panel) => panel.name === 'miniconsole')
 +                if (anchorIndex === -1) return
@@ -1709,55 +2321,75 @@ index 2da2695..524a3a1 100644
                  panels = panels.filter((element) => element.visible)
              }
 diff --git a/src/store/gui/index.ts b/src/store/gui/index.ts
-index 6249c23..da2cc63 100644
+index 6249c23..a4e46e1 100644
 --- a/src/store/gui/index.ts
 +++ b/src/store/gui/index.ts
-@@ -78,6 +78,8 @@ export const getDefaultState = (): GuiState => {
+@@ -78,6 +78,12 @@ export const getDefaultState = (): GuiState => {
                  { name: 'miscellaneous', visible: true },
                  { name: 'temperature', visible: true },
                  { name: 'miniconsole', visible: false },
 +                { name: 'probe-progress', visible: true },
 +                { name: 'klippertools', visible: true },
++                { name: 'nozzle-guard', visible: true },
++                { name: 'start-flow', visible: true },
++                { name: 'maintenance-tracker', visible: true },
++                { name: 'motion-wizard', visible: true },
              ],
              tabletLayout1: [
                  { name: 'webcam', visible: true },
-@@ -90,6 +92,8 @@ export const getDefaultState = (): GuiState => {
+@@ -90,6 +96,12 @@ export const getDefaultState = (): GuiState => {
              tabletLayout2: [
                  { name: 'temperature', visible: true },
                  { name: 'miniconsole', visible: true },
 +                { name: 'probe-progress', visible: true },
 +                { name: 'klippertools', visible: true },
++                { name: 'nozzle-guard', visible: true },
++                { name: 'start-flow', visible: true },
++                { name: 'maintenance-tracker', visible: true },
++                { name: 'motion-wizard', visible: true },
              ],
              desktopLayout1: [
                  { name: 'webcam', visible: true },
-@@ -102,6 +106,8 @@ export const getDefaultState = (): GuiState => {
+@@ -102,6 +114,12 @@ export const getDefaultState = (): GuiState => {
              desktopLayout2: [
                  { name: 'temperature', visible: true },
                  { name: 'miniconsole', visible: true },
 +                { name: 'probe-progress', visible: true },
 +                { name: 'klippertools', visible: true },
++                { name: 'nozzle-guard', visible: true },
++                { name: 'start-flow', visible: true },
++                { name: 'maintenance-tracker', visible: true },
++                { name: 'motion-wizard', visible: true },
              ],
              widescreenLayout1: [
                  { name: 'toolhead-control', visible: true },
-@@ -116,6 +122,8 @@ export const getDefaultState = (): GuiState => {
+@@ -116,6 +134,12 @@ export const getDefaultState = (): GuiState => {
              widescreenLayout3: [
                  { name: 'webcam', visible: true },
                  { name: 'miniconsole', visible: true },
 +                { name: 'probe-progress', visible: true },
 +                { name: 'klippertools', visible: true },
++                { name: 'nozzle-guard', visible: true },
++                { name: 'start-flow', visible: true },
++                { name: 'maintenance-tracker', visible: true },
++                { name: 'motion-wizard', visible: true },
              ],
          },
          editor: {
 diff --git a/src/store/variables.ts b/src/store/variables.ts
-index b940783..7de3683 100644
+index b940783..548c250 100644
 --- a/src/store/variables.ts
 +++ b/src/store/variables.ts
-@@ -116,6 +116,8 @@ export const allDashboardPanels = [
+@@ -116,6 +116,12 @@ export const allDashboardPanels = [
      'led-effects',
      'machine-settings',
      'miniconsole',
 +    'probe-progress',
 +    'klippertools',
++    'nozzle-guard',
++    'start-flow',
++    'maintenance-tracker',
++    'motion-wizard',
      'miscellaneous',
      'spoolman',
      'mmu',

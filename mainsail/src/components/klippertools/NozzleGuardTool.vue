@@ -5,22 +5,24 @@
         </v-alert>
 
         <div v-if="status" class="klippertools-comparison mb-3">
-            <div>
+            <div class="nozzle-card">
                 <div class="text-caption text--secondary">
                     {{ $t('Panels.KlippertoolsPanel.NozzleGuard.KlipperNozzle') }}
                 </div>
-                <div class="text-h5">{{ formatNozzle(status.configured_nozzle) }}</div>
+                <div class="nozzle-card__value">{{ formatNozzle(status.configured_nozzle) }}</div>
             </div>
-            <v-icon :color="comparisonColor">{{ comparisonIcon }}</v-icon>
-            <div class="text-right">
+            <div class="nozzle-comparison-icon" :class="'nozzle-comparison-icon--' + alertType">
+                <v-icon :color="comparisonColor">{{ comparisonIcon }}</v-icon>
+            </div>
+            <div class="nozzle-card text-right" :class="'nozzle-card--' + alertType">
                 <div class="text-caption text--secondary">
                     {{ $t('Panels.KlippertoolsPanel.NozzleGuard.FileNozzle') }}
                 </div>
-                <div class="text-h5">{{ detectedNozzleText }}</div>
+                <div class="nozzle-card__value">{{ detectedNozzleText }}</div>
             </div>
         </div>
 
-        <div v-if="status && status.filename" class="text-caption text--secondary text-truncate mb-3">
+        <div v-if="status && status.filename" class="nozzle-filename text-caption text--secondary text-truncate mb-3">
             {{ status.filename }}
         </div>
 
@@ -137,7 +139,65 @@ export default class NozzleGuardTool extends Mixins(BaseMixin) {
     align-items: center;
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-    gap: 16px;
+    gap: 10px;
+}
+
+.nozzle-card {
+    border: 1px solid rgba(127, 127, 127, 0.2);
+    border-radius: 8px;
+    min-width: 0;
+    padding: 11px 12px;
+    background: rgba(127, 127, 127, 0.06);
+}
+
+.nozzle-card--success {
+    border-color: rgba(76, 175, 80, 0.34);
+    background: rgba(76, 175, 80, 0.07);
+}
+
+.nozzle-card--warning {
+    border-color: rgba(255, 193, 7, 0.34);
+    background: rgba(255, 193, 7, 0.07);
+}
+
+.nozzle-card--error {
+    border-color: rgba(244, 67, 54, 0.4);
+    background: rgba(244, 67, 54, 0.08);
+}
+
+.nozzle-card__value {
+    font-size: 1.35rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    line-height: 1.35;
+    margin-top: 2px;
+    white-space: nowrap;
+}
+
+.nozzle-comparison-icon {
+    align-items: center;
+    border: 1px solid rgba(127, 127, 127, 0.22);
+    border-radius: 50%;
+    display: flex;
+    height: 34px;
+    justify-content: center;
+    width: 34px;
+    background: rgba(127, 127, 127, 0.08);
+}
+
+.nozzle-comparison-icon--success {
+    border-color: rgba(76, 175, 80, 0.34);
+}
+
+.nozzle-comparison-icon--warning,
+.nozzle-comparison-icon--error {
+    border-color: rgba(244, 67, 54, 0.34);
+}
+
+.nozzle-filename {
+    border-radius: 5px;
+    padding: 5px 8px;
+    background: rgba(127, 127, 127, 0.06);
 }
 
 .ga-2 {

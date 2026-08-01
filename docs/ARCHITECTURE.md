@@ -23,14 +23,15 @@ Klippertools UI therefore receives real-time state through the normal
 
 ## UI Core
 
-Probe Progress remains a dedicated matrix card. The other tools share
-`KlippertoolsPanel.vue`, which supplies responsive tabs, a common location under
-Console, and an attention count. A confirmed blocking nozzle mismatch and each
-overdue maintenance entry contribute to that count.
+Probe Progress, UI Core, Nozzle Guard, StartFlow, Maintenance Tracker, and
+Motion Wizard are independent dashboard cards. Each can be moved, collapsed,
+or hidden through Mainsail's normal dashboard editor. UI Core owns suite status,
+attention count, and the authenticated update action; the other cards render a
+single focused tool.
 
 Dashboard injection is version matched. Existing saved dashboard layouts gain
-Probe Progress and Klippertools immediately after Console without moving other
-saved panels. Both cards remain available in Mainsail's dashboard editor.
+the available Klippertools cards immediately after Console without moving other
+saved panels. All cards remain available in Mainsail's dashboard editor.
 
 ## Probe Progress
 

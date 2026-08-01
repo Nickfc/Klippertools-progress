@@ -10,46 +10,47 @@
             <v-chip v-if="attentionCount" x-small color="error" outlined class="ml-2">
                 {{ $t('Panels.KlippertoolsPanel.Attention', { count: attentionCount }) }}
             </v-chip>
-            <v-btn
-                v-if="updaterAvailable"
-                icon
-                small
-                class="ml-1"
-                :loading="updateStatus.updating"
-                :disabled="printerIsPrinting"
-                :aria-label="$t('Panels.KlippertoolsPanel.Update.Title')"
-                @click.stop="openUpdateDialog">
-                <v-icon small>{{ mdiCloudDownloadOutline }}</v-icon>
-            </v-btn>
         </template>
 
-        <v-tabs v-model="tab" grow show-arrows background-color="transparent" color="primary">
-            <v-tab :aria-label="$t('Panels.KlippertoolsPanel.Tabs.Guard')">
-                <v-icon small class="mr-1">{{ mdiShieldCheckOutline }}</v-icon>
-                <span class="klippertools-tab-label">{{ $t('Panels.KlippertoolsPanel.Tabs.Guard') }}</span>
-            </v-tab>
-            <v-tab :aria-label="$t('Panels.KlippertoolsPanel.Tabs.Start')">
-                <v-icon small class="mr-1">{{ mdiProgressClock }}</v-icon>
-                <span class="klippertools-tab-label">{{ $t('Panels.KlippertoolsPanel.Tabs.Start') }}</span>
-            </v-tab>
-            <v-tab :aria-label="$t('Panels.KlippertoolsPanel.Tabs.Maintenance')">
-                <v-icon small class="mr-1">{{ mdiWrenchClock }}</v-icon>
-                <span class="klippertools-tab-label">{{ $t('Panels.KlippertoolsPanel.Tabs.Maintenance') }}</span>
-            </v-tab>
-            <v-tab :aria-label="$t('Panels.KlippertoolsPanel.Tabs.Motion')">
-                <v-icon small class="mr-1">{{ mdiTuneVariant }}</v-icon>
-                <span class="klippertools-tab-label">{{ $t('Panels.KlippertoolsPanel.Tabs.Motion') }}</span>
-            </v-tab>
-        </v-tabs>
+        <v-card-text class="klippertools-core">
+            <div class="klippertools-core__identity">
+                <div class="klippertools-core__mark">
+                    <v-icon color="primary">{{ mdiToolboxOutline }}</v-icon>
+                </div>
+                <div class="flex-grow-1">
+                    <div class="font-weight-medium">{{ $t('Panels.KlippertoolsPanel.Headline') }}</div>
+                    <div class="text-caption text--secondary">
+                        {{ $t('Panels.KlippertoolsPanel.Update.Installed', { version: installedVersion }) }}
+                    </div>
+                </div>
+                <v-chip x-small outlined color="success">{{ enabledToolCount }} / 4</v-chip>
+            </div>
 
-        <v-divider />
+            <div class="klippertools-core__tools">
+                <div
+                    v-for="tool in toolStatuses"
+                    :key="tool.key"
+                    class="klippertools-core__tool"
+                    :class="{ 'klippertools-core__tool--available': tool.available }">
+                    <v-icon small>{{ tool.icon }}</v-icon>
+                    <span>{{ tool.label }}</span>
+                    <i />
+                </div>
+            </div>
 
-        <v-tabs-items v-model="tab" class="transparent">
-            <v-tab-item><nozzle-guard-tool /></v-tab-item>
-            <v-tab-item><start-flow-tool /></v-tab-item>
-            <v-tab-item><maintenance-tracker-tool /></v-tab-item>
-            <v-tab-item><motion-wizard-tool /></v-tab-item>
-        </v-tabs-items>
+            <v-btn
+                v-if="updaterAvailable"
+                block
+                small
+                outlined
+                color="primary"
+                :loading="updateStatus.updating"
+                :disabled="printerIsPrinting"
+                @click="openUpdateDialog">
+                <v-icon small left>{{ mdiCloudDownloadOutline }}</v-icon>
+                {{ $t('Panels.KlippertoolsPanel.Update.Action') }}
+            </v-btn>
+        </v-card-text>
 
         <v-dialog v-model="showUpdateDialog" max-width="520">
             <v-card>
@@ -99,10 +100,6 @@
 import { Component, Mixins } from 'vue-property-decorator'
 import BaseMixin from '@/components/mixins/base'
 import Panel from '@/components/ui/Panel.vue'
-import MaintenanceTrackerTool from '@/components/klippertools/MaintenanceTrackerTool.vue'
-import MotionWizardTool from '@/components/klippertools/MotionWizardTool.vue'
-import NozzleGuardTool from '@/components/klippertools/NozzleGuardTool.vue'
-import StartFlowTool from '@/components/klippertools/StartFlowTool.vue'
 import {
     mdiCloudDownloadOutline,
     mdiProgressClock,
@@ -120,13 +117,16 @@ interface UpdateStatus {
     restart_required?: boolean
 }
 
+interface ToolStatus {
+    key: string
+    label: string
+    icon: string
+    available: boolean
+}
+
 @Component({
     components: {
-        MaintenanceTrackerTool,
-        MotionWizardTool,
-        NozzleGuardTool,
         Panel,
-        StartFlowTool,
     },
 })
 export default class KlippertoolsPanel extends Mixins(BaseMixin) {
@@ -137,7 +137,6 @@ export default class KlippertoolsPanel extends Mixins(BaseMixin) {
     mdiTuneVariant = mdiTuneVariant
     mdiWrenchClock = mdiWrenchClock
 
-    tab = 0
     showUpdateDialog = false
     updateTimer: number | null = null
     updateStatus: UpdateStatus = {
@@ -175,6 +174,39 @@ export default class KlippertoolsPanel extends Mixins(BaseMixin) {
 
     get installedVersion(): string {
         return this.updateStatus.installed_version || 'unknown'
+    }
+
+    get toolStatuses(): ToolStatus[] {
+        return [
+            {
+                key: 'guard',
+                label: String(this.$t('Panels.KlippertoolsPanel.Tabs.Guard')),
+                icon: mdiShieldCheckOutline,
+                available: Boolean(this.$store.state.printer?.nozzle_guard),
+            },
+            {
+                key: 'start',
+                label: String(this.$t('Panels.KlippertoolsPanel.Tabs.Start')),
+                icon: mdiProgressClock,
+                available: Boolean(this.$store.state.printer?.start_flow),
+            },
+            {
+                key: 'maintenance',
+                label: String(this.$t('Panels.KlippertoolsPanel.Tabs.Maintenance')),
+                icon: mdiWrenchClock,
+                available: this.available,
+            },
+            {
+                key: 'motion',
+                label: String(this.$t('Panels.KlippertoolsPanel.Tabs.Motion')),
+                icon: mdiTuneVariant,
+                available: Boolean(this.$store.state.printer?.motion_wizard),
+            },
+        ]
+    }
+
+    get enabledToolCount(): number {
+        return this.toolStatuses.filter((tool) => tool.available).length
     }
 
     async openUpdateDialog(): Promise<void> {
@@ -239,9 +271,69 @@ export default class KlippertoolsPanel extends Mixins(BaseMixin) {
 </script>
 
 <style scoped>
-@media (max-width: 520px) {
-    .klippertools-tab-label {
-        display: none;
-    }
+.klippertools-core {
+    padding: 14px 16px 16px;
+}
+
+.klippertools-core__identity {
+    align-items: center;
+    display: flex;
+    gap: 11px;
+    margin-bottom: 12px;
+}
+
+.klippertools-core__mark {
+    align-items: center;
+    border: 1px solid rgba(33, 150, 243, 0.28);
+    border-radius: 9px;
+    display: flex;
+    height: 40px;
+    justify-content: center;
+    width: 40px;
+    background: rgba(33, 150, 243, 0.09);
+}
+
+.klippertools-core__tools {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+    margin-bottom: 12px;
+}
+
+.klippertools-core__tool {
+    align-items: center;
+    border: 1px solid rgba(127, 127, 127, 0.14);
+    border-radius: 7px;
+    color: rgba(127, 127, 127, 0.82);
+    display: grid;
+    font-size: 0.72rem;
+    gap: 7px;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    min-width: 0;
+    padding: 7px 8px;
+    background: rgba(127, 127, 127, 0.035);
+}
+
+.klippertools-core__tool span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.klippertools-core__tool i {
+    border-radius: 50%;
+    height: 7px;
+    width: 7px;
+    background: rgba(127, 127, 127, 0.45);
+}
+
+.klippertools-core__tool--available {
+    border-color: rgba(76, 175, 80, 0.22);
+    color: inherit;
+    background: rgba(76, 175, 80, 0.045);
+}
+
+.klippertools-core__tool--available i {
+    background: #66bb6a;
 }
 </style>

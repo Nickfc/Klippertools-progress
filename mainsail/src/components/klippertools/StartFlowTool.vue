@@ -7,15 +7,21 @@
             </div>
             <v-progress-linear :value="status.progress" :color="progressColor" height="10" rounded class="mb-3" />
 
-            <v-list dense class="transparent pa-0">
-                <v-list-item v-for="stage in status.stages" :key="stage.name" class="px-0">
-                    <v-list-item-icon class="mr-3">
+            <v-list dense class="start-flow-list transparent pa-0">
+                <v-list-item
+                    v-for="stage in status.stages"
+                    :key="stage.name"
+                    class="start-flow-stage px-0"
+                    :class="'start-flow-stage--' + stage.state">
+                    <v-list-item-icon class="start-flow-stage__icon mr-3">
                         <v-icon :color="stageColor(stage)" small>{{ stageIcon(stage) }}</v-icon>
                     </v-list-item-icon>
                     <v-list-item-content>
                         <v-list-item-title>{{ stageLabel(stage) }}</v-list-item-title>
                     </v-list-item-content>
-                    <v-list-item-action-text>{{ stageTime(stage) }}</v-list-item-action-text>
+                    <v-list-item-action-text class="start-flow-stage__time">
+                        {{ stageTime(stage) }}
+                    </v-list-item-action-text>
                 </v-list-item>
             </v-list>
         </template>
@@ -121,3 +127,49 @@ export default class StartFlowTool extends Mixins(BaseMixin) {
     }
 }
 </script>
+
+<style scoped>
+.start-flow-list {
+    position: relative;
+}
+
+.start-flow-stage {
+    border-radius: 7px;
+    margin-bottom: 3px;
+    min-height: 42px;
+    padding-right: 8px !important;
+    transition: background-color 160ms ease;
+}
+
+.start-flow-stage--active {
+    background: rgba(255, 193, 7, 0.09);
+}
+
+.start-flow-stage--done {
+    background: rgba(76, 175, 80, 0.035);
+}
+
+.start-flow-stage--error {
+    background: rgba(244, 67, 54, 0.09);
+}
+
+.start-flow-stage__icon {
+    align-items: center;
+    border: 1px solid rgba(127, 127, 127, 0.2);
+    border-radius: 50%;
+    height: 28px;
+    justify-content: center;
+    margin-bottom: 7px !important;
+    margin-top: 7px !important;
+    min-width: 28px;
+    width: 28px;
+    background: rgba(127, 127, 127, 0.08);
+}
+
+.start-flow-stage__time {
+    border-radius: 10px;
+    font-variant-numeric: tabular-nums;
+    padding: 2px 7px;
+    background: rgba(127, 127, 127, 0.08);
+}
+</style>

@@ -2,6 +2,10 @@
 
 ## 0.2.1 - 2026-08-01
 
+- Split Probe Progress, UI Core, Nozzle Guard, StartFlow, Maintenance Tracker,
+  and Motion Wizard into independent movable Mainsail dashboard cards.
+- Refined the UI with a bed-shaped probing matrix, X/Y orientation, a state
+  legend, clearer status hierarchy, and consistent responsive tool cards.
 - Added an authenticated Update button to the Klippertools Mainsail panel.
 - Added a Moonraker update controller that refuses updates while printing or
   paused and launches commands without a shell.

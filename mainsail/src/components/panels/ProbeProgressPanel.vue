@@ -16,40 +16,56 @@
         <v-card-text class="probe-progress-content">
             <template v-if="hasMatrix">
                 <div class="probe-progress-details">
-                    <span>{{ primaryStatus }}</span>
-                    <span v-if="secondaryStatus">{{ secondaryStatus }}</span>
+                    <span class="probe-progress-status">
+                        <span class="probe-progress-status__dot" :class="'probe-progress-status__dot--' + visualState" />
+                        {{ primaryStatus }}
+                    </span>
+                    <v-chip v-if="secondaryStatus" x-small outlined class="probe-progress-sample">
+                        {{ secondaryStatus }}
+                    </v-chip>
                 </div>
 
-                <div
-                    class="probe-progress-matrix"
-                    role="grid"
-                    :aria-label="$t('Panels.ProbeProgressPanel.MatrixLabel')"
-                    :style="matrixStyle">
-                    <template v-for="(cell, slotIndex) in matrixSlots">
-                        <div
-                            v-if="cell"
-                            :key="'cell-' + cell.index"
-                            class="probe-progress-cell"
-                            :class="'probe-progress-cell--' + cell.state"
-                            role="gridcell"
-                            :title="cellTitle(cell)"
-                            :aria-label="cellTitle(cell)">
-                            <span>{{ cell.index }}</span>
-                        </div>
-                        <div
-                            v-else
-                            :key="'empty-' + slotIndex"
-                            class="probe-progress-cell probe-progress-cell--empty"
-                            aria-hidden="true" />
-                    </template>
+                <div class="probe-progress-plate">
+                    <span class="probe-progress-axis probe-progress-axis--y">Y</span>
+                    <div
+                        class="probe-progress-matrix"
+                        role="grid"
+                        :aria-label="$t('Panels.ProbeProgressPanel.MatrixLabel')"
+                        :style="matrixStyle">
+                        <template v-for="(cell, slotIndex) in matrixSlots">
+                            <div
+                                v-if="cell"
+                                :key="'cell-' + cell.index"
+                                class="probe-progress-cell"
+                                :class="'probe-progress-cell--' + cell.state"
+                                role="gridcell"
+                                :title="cellTitle(cell)"
+                                :aria-label="cellTitle(cell)">
+                                <span>{{ cell.index }}</span>
+                            </div>
+                            <div
+                                v-else
+                                :key="'empty-' + slotIndex"
+                                class="probe-progress-cell probe-progress-cell--empty"
+                                aria-hidden="true" />
+                        </template>
+                    </div>
+                    <span class="probe-progress-axis probe-progress-axis--x">X</span>
+                </div>
+
+                <div class="probe-progress-legend" aria-hidden="true">
+                    <span v-for="state in ['pending', 'active', 'done']" :key="state">
+                        <i :class="'probe-progress-legend__swatch--' + state" />
+                        {{ $t(`Panels.ProbeProgressPanel.States.${state}`) }}
+                    </span>
                 </div>
 
                 <v-progress-linear
                     class="probe-progress-bar"
                     :value="progress"
                     :color="progressColor"
-                    background-color="#8c2020"
-                    height="24"
+                    background-color="grey darken-3"
+                    height="26"
                     rounded>
                     <strong>{{ progressBarText }}</strong>
                 </v-progress-linear>
@@ -202,6 +218,13 @@ export default class ProbeProgressPanel extends Mixins(BaseMixin) {
         return '#43a047'
     }
 
+    get visualState(): string {
+        if (this.probeProgress?.state === 'complete') return 'done'
+        if (this.probeProgress?.state === 'error') return 'error'
+        if (this.probeProgress?.active) return 'active'
+        return 'pending'
+    }
+
     get progressBarText(): string {
         const status = this.probeProgress
         if (!status) return ''
@@ -263,28 +286,112 @@ export default class ProbeProgressPanel extends Mixins(BaseMixin) {
 }
 
 .probe-progress-content {
-    padding: 16px;
+    padding: 14px 16px 16px;
 }
 
 .probe-progress-details {
+    align-items: center;
     display: flex;
     justify-content: space-between;
     gap: 12px;
-    margin-bottom: 10px;
-    color: rgba(255, 255, 255, 0.72);
+    margin-bottom: 12px;
     font-size: 0.82rem;
+}
+
+.probe-progress-status {
+    align-items: center;
+    display: inline-flex;
+    font-weight: 600;
+    gap: 8px;
+}
+
+.probe-progress-status__dot {
+    border-radius: 50%;
+    display: inline-block;
+    height: 9px;
+    width: 9px;
+}
+
+.probe-progress-status__dot--pending {
+    background: #ef5350;
+}
+
+.probe-progress-status__dot--active {
+    background: #ffca28;
+    box-shadow: 0 0 0 4px rgba(255, 202, 40, 0.14);
+}
+
+.probe-progress-status__dot--done {
+    background: #66bb6a;
+}
+
+.probe-progress-status__dot--error {
+    background: var(--v-error-base);
+}
+
+.probe-progress-sample {
+    opacity: 0.82;
+}
+
+.probe-progress-plate {
+    position: relative;
+    width: 100%;
+    max-width: 440px;
+    margin: 0 auto 10px;
+    padding: 16px 16px 20px 22px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    background:
+        radial-gradient(circle at 50% 35%, rgba(255, 255, 255, 0.05), transparent 62%),
+        rgba(0, 0, 0, 0.2);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.05),
+        0 6px 18px rgba(0, 0, 0, 0.16);
+}
+
+.probe-progress-plate::before,
+.probe-progress-plate::after {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(127, 127, 127, 0.35);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.45);
+    content: '';
+    height: 5px;
+    top: 7px;
+    width: 5px;
+}
+
+.probe-progress-plate::before {
+    left: 8px;
+}
+
+.probe-progress-plate::after {
+    right: 8px;
 }
 
 .probe-progress-matrix {
     display: grid;
     gap: 6px;
-    width: 100%;
-    max-width: 440px;
-    margin: 0 auto 14px;
-    padding: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 6px;
-    background: #151515;
+}
+
+.probe-progress-axis {
+    position: absolute;
+    color: rgba(127, 127, 127, 0.8);
+    font-size: 0.58rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+}
+
+.probe-progress-axis--y {
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%) rotate(-90deg);
+}
+
+.probe-progress-axis--x {
+    bottom: 5px;
+    left: 50%;
+    transform: translateX(-50%);
 }
 
 .probe-progress-cell {
@@ -293,7 +400,8 @@ export default class ProbeProgressPanel extends Mixins(BaseMixin) {
     justify-content: center;
     min-width: 0;
     aspect-ratio: 1;
-    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 5px;
     color: rgba(255, 255, 255, 0.86);
     font-size: clamp(0.56rem, 1vw, 0.74rem);
     font-weight: 600;
@@ -304,14 +412,14 @@ export default class ProbeProgressPanel extends Mixins(BaseMixin) {
 }
 
 .probe-progress-cell--pending {
-    background: #b3261e;
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+    background: linear-gradient(145deg, #d43b32, #9f211b);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .probe-progress-cell--active {
     z-index: 1;
     color: #201600;
-    background: #f9a825;
+    background: linear-gradient(145deg, #ffd54f, #f39c12);
     box-shadow:
         0 0 0 2px rgba(255, 213, 79, 0.35),
         0 0 16px rgba(249, 168, 37, 0.5);
@@ -320,18 +428,54 @@ export default class ProbeProgressPanel extends Mixins(BaseMixin) {
 }
 
 .probe-progress-cell--done {
-    background: #2e7d32;
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+    background: linear-gradient(145deg, #43a047, #24762a);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .probe-progress-cell--empty {
     visibility: hidden;
 }
 
+.probe-progress-legend {
+    align-items: center;
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    margin: 0 0 12px;
+    color: rgba(127, 127, 127, 0.95);
+    font-size: 0.68rem;
+}
+
+.probe-progress-legend span {
+    align-items: center;
+    display: inline-flex;
+    gap: 5px;
+}
+
+.probe-progress-legend i {
+    border-radius: 3px;
+    display: inline-block;
+    height: 8px;
+    width: 8px;
+}
+
+.probe-progress-legend__swatch--pending {
+    background: #c4352c;
+}
+
+.probe-progress-legend__swatch--active {
+    background: #ffca28;
+}
+
+.probe-progress-legend__swatch--done {
+    background: #43a047;
+}
+
 .probe-progress-bar {
     color: white;
-    font-size: 0.76rem;
+    font-size: 0.74rem;
     letter-spacing: 0.01em;
+    box-shadow: inset 0 0 0 1px rgba(127, 127, 127, 0.22);
 }
 
 .probe-progress-error {

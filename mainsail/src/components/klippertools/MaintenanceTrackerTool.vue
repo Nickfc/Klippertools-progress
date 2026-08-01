@@ -11,7 +11,8 @@
             <v-list-item
                 v-for="entry in activeEntries"
                 :key="entry.id"
-                class="maintenance-entry px-0"
+                class="maintenance-entry px-3"
+                :class="{ 'maintenance-entry--due': entryProgress(entry) >= 100 }"
                 @click="openDetails(entry)">
                 <v-list-item-content>
                     <div class="d-flex justify-space-between mb-1">
@@ -151,6 +152,25 @@ export default class MaintenanceTrackerTool extends Mixins(BaseMixin) {
 
 <style scoped>
 .maintenance-entry {
+    border: 1px solid rgba(127, 127, 127, 0.16);
+    border-radius: 8px;
     cursor: pointer;
+    margin-bottom: 7px;
+    background: rgba(127, 127, 127, 0.045);
+    transition:
+        background-color 150ms ease,
+        border-color 150ms ease,
+        transform 150ms ease;
+}
+
+.maintenance-entry:hover {
+    border-color: rgba(33, 150, 243, 0.36);
+    background: rgba(33, 150, 243, 0.07);
+    transform: translateY(-1px);
+}
+
+.maintenance-entry--due {
+    border-color: rgba(244, 67, 54, 0.36);
+    background: rgba(244, 67, 54, 0.065);
 }
 </style>

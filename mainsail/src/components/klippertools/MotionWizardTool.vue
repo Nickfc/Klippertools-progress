@@ -6,7 +6,7 @@
 
         <v-progress-linear :value="status ? status.progress : 0" color="primary" height="8" rounded class="mb-4" />
 
-        <div class="motion-step mb-3">
+        <div class="motion-step mb-3" :class="{ 'motion-step--done': allHomed }">
             <div class="motion-step__number">1</div>
             <div class="motion-step__content">
                 <div class="font-weight-medium">{{ $t('Panels.KlippertoolsPanel.Motion.HomeTitle') }}</div>
@@ -18,7 +18,7 @@
             </v-btn>
         </div>
 
-        <div class="motion-step mb-3">
+        <div class="motion-step mb-3" :class="{ 'motion-step--done': status && status.noise_complete }">
             <div class="motion-step__number">2</div>
             <div class="motion-step__content">
                 <div class="font-weight-medium">{{ $t('Panels.KlippertoolsPanel.Motion.NoiseTitle') }}</div>
@@ -30,7 +30,7 @@
             </v-btn>
         </div>
 
-        <div class="motion-step mb-4">
+        <div class="motion-step mb-4" :class="{ 'motion-step--done': canSave }">
             <div class="motion-step__number">3</div>
             <div class="motion-step__content">
                 <div class="font-weight-medium">{{ $t('Panels.KlippertoolsPanel.Motion.CalibrateTitle') }}</div>
@@ -46,7 +46,7 @@
 
         <v-row dense class="mb-2">
             <v-col v-for="axis in ['x', 'y']" :key="axis" cols="6">
-                <v-card outlined class="pa-3">
+                <v-card outlined class="motion-result-card pa-3" :class="{ 'motion-result-card--ready': result(axis) }">
                     <div class="text-caption text--secondary">{{ axis.toUpperCase() }}</div>
                     <template v-if="result(axis)">
                         <div class="font-weight-medium">{{ result(axis).type }}</div>
@@ -180,8 +180,20 @@ export default class MotionWizardTool extends Mixins(BaseMixin) {
 <style scoped>
 .motion-step {
     align-items: center;
+    border: 1px solid rgba(127, 127, 127, 0.16);
+    border-radius: 8px;
     display: flex;
     gap: 12px;
+    padding: 9px 10px;
+    background: rgba(127, 127, 127, 0.045);
+    transition:
+        background-color 160ms ease,
+        border-color 160ms ease;
+}
+
+.motion-step--done {
+    border-color: rgba(76, 175, 80, 0.3);
+    background: rgba(76, 175, 80, 0.055);
 }
 
 .motion-step__number {
@@ -200,5 +212,23 @@ export default class MotionWizardTool extends Mixins(BaseMixin) {
 .motion-step__content {
     flex: 1 1 auto;
     min-width: 0;
+}
+
+.motion-step--done .motion-step__number {
+    background: rgba(76, 175, 80, 0.16);
+    color: #66bb6a;
+}
+
+.motion-result-card {
+    min-height: 92px;
+    background: rgba(127, 127, 127, 0.035) !important;
+    transition:
+        background-color 160ms ease,
+        border-color 160ms ease;
+}
+
+.motion-result-card--ready {
+    border-color: rgba(33, 150, 243, 0.34) !important;
+    background: rgba(33, 150, 243, 0.06) !important;
 }
 </style>
