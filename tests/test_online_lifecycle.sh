@@ -38,7 +38,8 @@ gcode:
     G1 X10 Y10
 CFG
 
-cp -a "$SUITE_ROOT/." "$REPOSITORY_ROOT/"
+unzip -q "$SUITE_ROOT/dist/klippertools-suite-0.2.1.zip" \
+    -d "$REPOSITORY_ROOT"
 git -C "$REPOSITORY_ROOT" init -q -b main
 git -C "$REPOSITORY_ROOT" config user.name "Klippertools Test"
 git -C "$REPOSITORY_ROOT" config user.email "test@example.invalid"
