@@ -53,3 +53,16 @@ jobs:
           unzip -tq source/mainsail-v2.18.2-klippertools-source.zip
           unzip -tq dist/klippertools-suite-0.4.0.zip
           (cd dist && sha256sum -c klippertools-suite-0.4.0.zip.sha256)
+
+      - name: Package validation workspace
+        if: always()
+        run: zip -qr /tmp/klippertools-validation-workspace.zip . -x '.git/*'
+
+      - name: Upload validation workspace
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: klippertools-validation-workspace-${{ github.sha }}
+          path: /tmp/klippertools-validation-workspace.zip
+          if-no-files-found: error
+          retention-days: 1
