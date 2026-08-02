@@ -141,16 +141,44 @@ jobs:
 
           path = Path('build/finalize-v08.sh')
           text = path.read_text(encoding='utf-8')
-          needle = '''  )
+
+          icon_needle = '''  )
             patch_file="$GITHUB_WORKSPACE/mainsail/mainsail-${version}-v0.8.0.patch"
           '''
-          replacement = '''  )
+          icon_replacement = '''  )
             sed -i '/^[[:space:]]*mdiHistory,$/d' "$final_dir/src/components/mixins/dashboard.ts"
             patch_file="$GITHUB_WORKSPACE/mainsail/mainsail-${version}-v0.8.0.patch"
           '''
-          if text.count(needle) != 1:
+          if text.count(icon_needle) != 1:
               raise SystemExit('unexpected finalizer patch-generation layout')
-          path.write_text(text.replace(needle, replacement, 1), encoding='utf-8')
+          text = text.replace(icon_needle, icon_replacement, 1)
+
+          build_needle = '''rm -f -- mainsail/core-v2.17.0-v0.8.0.patch mainsail/core-v2.18.2-v0.8.0.patch
+
+          set -Eeuo pipefail
+          scripts/build-mainsail-v0.8.0.sh "$RUNNER_TEMP/mainsail-build-output"
+          '''
+          build_replacement = '''rm -f -- mainsail/core-v2.17.0-v0.8.0.patch mainsail/core-v2.18.2-v0.8.0.patch
+
+          python3 - <<'PY_PATCH'
+          from pathlib import Path
+
+          for patch_path in Path('mainsail').glob('mainsail-v*.patch'):
+              lines = patch_path.read_text(encoding='utf-8').splitlines()
+              normalized = [
+                  '+' if line.startswith('+') and not line.startswith('+++') and not line[1:].strip() else line
+                  for line in lines
+              ]
+              patch_path.write_text('\\n'.join(normalized) + '\\n', encoding='utf-8')
+          PY_PATCH
+
+          set -Eeuo pipefail
+          scripts/build-mainsail-v0.8.0.sh "$RUNNER_TEMP/mainsail-build-output"
+          '''
+          if text.count(build_needle) != 1:
+              raise SystemExit('unexpected finalizer build layout')
+          text = text.replace(build_needle, build_replacement, 1)
+          path.write_text(text, encoding='utf-8')
           PY
           chmod +x build/finalize-v08.sh
           build/finalize-v08.sh
