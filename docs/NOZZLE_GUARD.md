@@ -29,3 +29,15 @@ recognizes numeric comment forms using `nozzle_diameter`, `nozzle diameter`,
 An override applies only until another file is selected or the current file is
 rechecked. Correcting an actual nozzle change requires updating Klipper's
 extruder configuration and restarting; the guard never alters that value.
+
+## Tool Registry integration
+
+When a Tool Registry profile is installed, Moonraker synchronizes its diameter,
+profile ID, and display name to Nozzle Guard's in-memory comparison reference.
+Nozzle Guard status identifies whether the comparison source is the installed
+registry profile or Klipper configuration.
+
+This does not edit `[extruder] nozzle_diameter`. Clearing the installed profile,
+restarting before synchronization, or a failed synchronization returns to the
+Klipper-configured fallback without disabling mismatch blocking. See
+[TOOL_REGISTRY.md](TOOL_REGISTRY.md).

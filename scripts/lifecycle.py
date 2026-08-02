@@ -30,7 +30,7 @@ import uuid
 import zipfile
 
 
-VERSION = "0.3.0"
+VERSION = "0.8.0"
 SCHEMA = 2
 EXTRA_NAMES = (
     "probe_progress",
@@ -38,6 +38,8 @@ EXTRA_NAMES = (
     "start_flow",
     "motion_wizard",
     "service_metrics",
+    "thermal_soak",
+    "calibration_center",
 )
 ACTIVE_PRINT_STATES = {"printing", "paused"}
 SAFE_PRINT_STATES = {"standby", "complete", "cancelled", "error"}
@@ -831,6 +833,46 @@ def ensure_service_metrics_config(paths: Paths) -> bool:
     return True
 
 
+def ensure_thermal_soak_config(paths: Paths) -> bool:
+    """Enable the optional v0.4 Thermal Soak module on existing installs."""
+    text = paths.suite_cfg.read_text(encoding="utf-8")
+    if any(line.strip() == "[thermal_soak]" for line in text.splitlines()):
+        return False
+    addition = (
+        "\n[thermal_soak]\n"
+        "# Conservative defaults; all values can be overridden per command.\n"
+        "default_sensor: heater_bed\n"
+        "stability_window: 300\n"
+        "max_wait: 1800\n"
+        "temperature_tolerance: 0.30\n"
+        "slope_limit: 0.05\n"
+        "range_limit: 0.50\n"
+        "sample_interval: 2\n"
+    )
+    mode = paths.suite_cfg.stat().st_mode & 0o777
+    atomic_write_bytes(
+        paths.suite_cfg, (text.rstrip() + "\n" + addition).encode(), mode=mode
+    )
+    return True
+
+
+def ensure_calibration_center_config(paths: Paths) -> bool:
+    """Enable the v0.5 Calibration Center without replacing user tuning."""
+    text = paths.suite_cfg.read_text(encoding="utf-8")
+    if any(line.strip() == "[calibration_center]" for line in text.splitlines()):
+        return False
+    addition = (
+        "\n[calibration_center]\n"
+        "# Calibration Center only orchestrates attended Klipper calibration\n"
+        "# commands. It never runs SAVE_CONFIG automatically.\n"
+    )
+    mode = paths.suite_cfg.stat().st_mode & 0o777
+    atomic_write_bytes(
+        paths.suite_cfg, (text.rstrip() + "\n" + addition).encode(), mode=mode
+    )
+    return True
+
+
 def update(paths: Paths, offline: bool, source_target: Path) -> None:
     check_user(paths)
     validate_source(paths)
@@ -889,6 +931,8 @@ def update(paths: Paths, offline: bool, source_target: Path) -> None:
         if not paths.suite_cfg.exists():
             atomic_copy(paths.suite_root / "config" / "klippertools.cfg", paths.suite_cfg)
         ensure_service_metrics_config(paths)
+        ensure_thermal_soak_config(paths)
+        ensure_calibration_center_config(paths)
         atomic_copy(paths.suite_root / "moonraker" / "klippertools.py", paths.moonraker_component)
         atomic_copy(
             paths.suite_root / "config" / "klippertools-moonraker.conf",
@@ -1192,10 +1236,17 @@ def verify(paths: Paths) -> None:
 
     if not paths.suite_cfg.is_file():
         problems.append("suite configuration is missing")
-    elif "[service_metrics]" not in {
-        line.strip() for line in paths.suite_cfg.read_text(encoding="utf-8").splitlines()
-    }:
-        problems.append("suite configuration does not enable service_metrics")
+    else:
+        enabled_sections = {
+            line.strip()
+            for line in paths.suite_cfg.read_text(encoding="utf-8").splitlines()
+        }
+        if "[service_metrics]" not in enabled_sections:
+            problems.append("suite configuration does not enable service_metrics")
+        if "[thermal_soak]" not in enabled_sections:
+            problems.append("suite configuration does not enable thermal_soak")
+        if "[calibration_center]" not in enabled_sections:
+            problems.append("suite configuration does not enable calibration_center")
     printer_text = paths.printer_cfg.read_text(encoding="utf-8") if paths.printer_cfg.is_file() else ""
     if "[include klippertools.cfg]" not in {line.strip() for line in printer_text.splitlines()}:
         problems.append("printer.cfg does not include klippertools.cfg")
@@ -1217,7 +1268,7 @@ def verify(paths: Paths) -> None:
             print(f"[fail] {problem}")
         fail(f"installation verification failed with {len(problems)} problem(s)")
     print(f"[ok] Klippertools Suite {VERSION} state and transaction journal")
-    print("[ok] five Klipper backends: checksums and Python syntax")
+    print("[ok] seven Klipper backends: checksums and Python syntax")
     print("[ok] Moonraker updater: checksum, Python syntax, and include")
     print("[ok] Klipper configuration include")
     print(f"[ok] complete Mainsail {version} file manifest")

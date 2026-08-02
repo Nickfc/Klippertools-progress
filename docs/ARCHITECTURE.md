@@ -135,3 +135,26 @@ The Probe Progress and Nozzle Guard hooks use Klipper private methods because
 Klipper currently exposes neither a public bed-mesh progress event nor a public
 pre-resume validation hook. Both boundaries are validated against the two
 listed Klipper revisions.
+
+## v0.5–v0.8 cumulative data services
+
+The v0.8 cumulative release retains the existing transactional Klipper and UI
+deployment model while adding two independent Moonraker-managed data stores:
+
+- `klippertools-tools.json` for tool profiles, installed state, usage, and
+  history;
+- `klippertools-timeline.json` for bounded factual events and retention
+  settings.
+
+Both use atomic write/fsync/replace behavior and live outside the source
+checkout. The existing `klippertools-service.json` advances from schema 1 to
+schema 2 in place, preserving counters, tasks, baselines, snoozes, and history.
+
+Nozzle Guard remains a Klipper extra because print-start blocking must remain
+close to Klipper's virtual-SD command path. Tool Registry is a Moonraker data
+service and synchronizes only an in-memory comparison reference. The
+configuration file remains authoritative fallback.
+
+Printer Health Timeline receives explicit Moonraker events and selected Klipper
+status transitions. Smart Maintenance reads that bounded event store and emits
+advisory status only; it is not a background model and has no cloud dependency.

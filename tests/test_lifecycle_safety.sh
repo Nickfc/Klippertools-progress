@@ -132,8 +132,8 @@ cmp -s "$legacy_update_root/moonraker.conf.original" \
 grep -q '^original-ui$' "$legacy_update_root/mainsail/index.html" ||
     fail "legacy migration uninstall did not restore Mainsail"
 
-# The exact production path from 0.2.1 to 0.3.0 preserves user tuning and
-# service data while adding the fifth Klipper collector section.
+# The production path from 0.2.1 to 0.8.0 preserves user tuning and all
+# persistent Klippertools data while adding the later managed components.
 make_fixture "$upgrade_021_root"
 rm -rf -- "$upgrade_021_root/klippertools"
 mkdir -p "$upgrade_021_root/klippertools"
@@ -146,6 +146,12 @@ printf '\n# retained 0.2.1 user tuning\n' \
 printf '{"sentinel":"preserve-service-data"}\n' \
     > "$upgrade_021_root/printer_data/klippertools-service.json"
 service_data_before="$(sha256sum "$upgrade_021_root/printer_data/klippertools-service.json" | cut -d' ' -f1)"
+printf '{"sentinel":"preserve-tool-data"}\n' \
+    > "$upgrade_021_root/printer_data/klippertools-tools.json"
+printf '{"sentinel":"preserve-timeline-data"}\n' \
+    > "$upgrade_021_root/printer_data/klippertools-timeline.json"
+tool_data_before="$(sha256sum "$upgrade_021_root/printer_data/klippertools-tools.json" | cut -d' ' -f1)"
+timeline_data_before="$(sha256sum "$upgrade_021_root/printer_data/klippertools-timeline.json" | cut -d' ' -f1)"
 mkdir -p "$upgrade_021_root/update-stage"
 cp -a "$SUITE_ROOT" "$upgrade_021_root/update-stage/repository"
 run_env "$upgrade_021_root" \
@@ -159,9 +165,25 @@ grep -q 'retained 0.2.1 user tuning' \
     fail "0.2.1 upgrade overwrote user tuning"
 [[ -f "$upgrade_021_root/klipper/klippy/extras/service_metrics.py" ]] ||
     fail "0.2.1 upgrade did not install service_metrics.py"
+grep -q '^\[thermal_soak\]$' \
+    "$upgrade_021_root/printer_data/config/klippertools.cfg" ||
+    fail "0.2.1 upgrade did not enable thermal_soak"
+[[ -f "$upgrade_021_root/klipper/klippy/extras/thermal_soak.py" ]] ||
+    fail "0.2.1 upgrade did not install thermal_soak.py"
+grep -q '^\[calibration_center\]$' \
+    "$upgrade_021_root/printer_data/config/klippertools.cfg" ||
+    fail "0.2.1 upgrade did not enable calibration_center"
+[[ -f "$upgrade_021_root/klipper/klippy/extras/calibration_center.py" ]] ||
+    fail "0.2.1 upgrade did not install calibration_center.py"
 service_data_after="$(sha256sum "$upgrade_021_root/printer_data/klippertools-service.json" | cut -d' ' -f1)"
 [[ "$service_data_before" == "$service_data_after" ]] ||
     fail "0.2.1 upgrade changed persistent service data"
+tool_data_after="$(sha256sum "$upgrade_021_root/printer_data/klippertools-tools.json" | cut -d' ' -f1)"
+timeline_data_after="$(sha256sum "$upgrade_021_root/printer_data/klippertools-timeline.json" | cut -d' ' -f1)"
+[[ "$tool_data_before" == "$tool_data_after" ]] ||
+    fail "0.2.1 upgrade changed persistent tool registry data"
+[[ "$timeline_data_before" == "$timeline_data_after" ]] ||
+    fail "0.2.1 upgrade changed persistent health timeline data"
 run_env "$upgrade_021_root" \
     "$upgrade_021_root/klippertools/scripts/check-install.sh" >/dev/null
 

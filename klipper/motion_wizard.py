@@ -7,7 +7,7 @@
 import time
 
 
-PLUGIN_VERSION = "0.3.0"
+PLUGIN_VERSION = "0.8.0"
 
 
 class MotionWizard:
