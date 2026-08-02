@@ -1,7 +1,7 @@
 # Cumulative v0.8 finalizer failure
 
-Run: 30750516383
-Commit: f9c95da86ede63461fabc2fc1c83105fe173cb80
+Run: 30750704254
+Commit: 8e8e598fff7901cc8308cfb2c7f34517729e99cb
 
 ```text
   adding: assets/vertexColorMixing-DC5j1q3D.js (deflated 60%)
@@ -165,7 +165,7 @@ test_target_without_low_drift_is_not_stable (test_thermal_soak.ThermalSoakModelT
 test_timeout_fails_closed (test_thermal_soak.ThermalSoakModelTest.test_timeout_fails_closed) ... ok
 
 ----------------------------------------------------------------------
-Ran 86 tests in 0.132s
+Ran 86 tests in 0.842s
 
 OK
 transactional install tests passed
@@ -383,7 +383,7 @@ mainsail/mainsail-v2.18.2.patch:2296: trailing whitespace.
 + 
 mainsail/mainsail-v2.18.2.patch:2446: trailing whitespace.
 + 
-HEAD is now at f9c95da build: launch cumulative v0.8 via validation
+HEAD is now at 8e8e598 build: launch cumulative v0.8 via validation
 Removing .github/workflows/build-v08.yml
 Removing dist/klippertools-suite-0.8.0.zip
 Removing dist/klippertools-suite-0.8.0.zip.sha256
