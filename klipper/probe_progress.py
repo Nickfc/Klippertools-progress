@@ -8,7 +8,7 @@ import logging
 import math
 
 
-PLUGIN_VERSION = "0.3.0"
+PLUGIN_VERSION = "0.4.0"
 
 
 def _rounded(value, digits=3):
