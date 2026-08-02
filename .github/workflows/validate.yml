@@ -136,6 +136,26 @@ jobs:
 
           rm -f .github/workflows/finalize-v08.yml build/finalize-v08-failure.md
           tar -xJf "$RUNNER_TEMP/v08-source-overlay.tar.xz"
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('build/finalize-v08.sh')
+          text = path.read_text(encoding='utf-8')
+          self_extract = 'cat build/v08-source-overlay.part* | base64 --decode | tar -xJ\n'
+          if text.count(self_extract) != 1:
+              raise SystemExit('unexpected finalizer self-extraction layout')
+          text = text.replace(self_extract, '', 1)
+          needle = '''  )
+            patch_file="$GITHUB_WORKSPACE/mainsail/mainsail-${version}-v0.8.0.patch"
+          '''
+          replacement = '''  )
+            sed -i '/^[[:space:]]*mdiHistory,$/d' "$final_dir/src/components/mixins/dashboard.ts"
+            patch_file="$GITHUB_WORKSPACE/mainsail/mainsail-${version}-v0.8.0.patch"
+          '''
+          if text.count(needle) != 1:
+              raise SystemExit('unexpected finalizer patch-generation layout')
+          path.write_text(text.replace(needle, replacement, 1), encoding='utf-8')
+          PY
           chmod +x build/finalize-v08.sh
           build/finalize-v08.sh
           trap - EXIT
