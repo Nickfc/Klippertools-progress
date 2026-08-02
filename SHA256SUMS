@@ -8,8 +8,8 @@ fa5b2d4433b835933b22140e01833a4972a0ee8532d76951286e3dd071994af0  ./.gitignore
 adefd9f615907c49635e7bc5065414003f20f2970756c7ee2f6c23bcfb5953ba  ./THIRD_PARTY_NOTICES.md
 62971e39fe609cdd84ea11b621f299cdba5242a47556c4aeccd5a3153e1ef2d1  ./config/klippertools-moonraker.conf
 03aa6af1c7e457f4c1babd539a113b3935e712dd69bc3fc23e39dfdde9ff9aac  ./config/klippertools.cfg
-cd2cde62c75c07b72d28ec4c8d2c595ce7d1a1634758e1c25dde2b5a8f731a97  ./dist/mainsail-v2.17.0-klippertools.zip
-e925bad910bb02ee547d78352ba9a6bacc31d3db9fad8861aaeddccec986fced  ./dist/mainsail-v2.18.2-klippertools.zip
+39d97fe352dea0576d3fff577a268ed6b76dc4c205176ad0279e770a628d4135  ./dist/mainsail-v2.17.0-klippertools.zip
+80527f34fcf4ee31087b7eff9230f259a088eafeba8a1ba26822e1687a4a04c7  ./dist/mainsail-v2.18.2-klippertools.zip
 5d4d3af3b38c52a21351072489dea6acef6e9b08e1146a4186f309095f2ee151  ./docs/ARCHITECTURE.md
 0b7531826f5cc1ee47e47cbca0c93547439729a3564fb2697e2d2690bf700a75  ./docs/CALIBRATION_CENTER.md
 2b42bfe3201022f5a236bdf19b75681dc4357ed9e967d5e2b99f6b18757da30b  ./docs/HEALTH_TIMELINE.md
