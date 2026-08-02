@@ -1,5 +1,58 @@
 # Changelog
 
+## 0.8.0 - 2026-08-02
+
+- Added Calibration Center with attended PID, bed-mesh, Z-offset, input-shaper,
+  pressure-advance guidance, rotation-distance calculation, and first-layer
+  workflows using Klipper's documented commands and status objects.
+- Added explicit confirmation, print-state and homing interlocks, runtime
+  hardware discovery, configured heater-limit validation, and review-only
+  calibration results. Calibration Center never invokes `SAVE_CONFIG` or a
+  restart command.
+- Added a persistent Nozzle & Tool Registry with named profiles, installed and
+  retired states, usage accumulation, history, import/export, and safe runtime
+  synchronization to Nozzle Guard without rewriting printer configuration.
+- Added Printer Health Timeline with factual provenance, bounded retention,
+  filters, JSON export, atomic storage, and strong clear confirmation. G-code
+  contents are never collected.
+- Added Smart Maintenance as an opt-in, evidence-gated advisory layer. It
+  explains every earlier-review suggestion and never changes counters,
+  baselines, task intervals, or service history silently.
+- Added schema-1 Service Manager migration that preserves counters, tasks,
+  baselines, snoozes, and history while adding Smart Maintenance fields.
+- Added dedicated native Mainsail workspaces and movable dashboard cards for
+  Calibration Center, Tool Registry, and Printer Health Timeline on Mainsail
+  v2.17.0 and v2.18.2.
+- Expanded backend coverage to 86 tests before release packaging and retained
+  transactional, power-loss, migration, checksum, and two-version UI gates.
+
+## 0.7.0 - developed in the cumulative 0.8.0 working branch
+
+- Added Printer Health Timeline and its shared factual event schema.
+
+## 0.6.0 - developed in the cumulative 0.8.0 working branch
+
+- Added Nozzle & Tool Registry and conservative Nozzle Guard synchronization.
+
+## 0.5.0 - developed in the cumulative 0.8.0 working branch
+
+- Added Calibration Center and its behavior/safety contract.
+
+## 0.4.0 - 2026-08-02
+
+- Added Thermal Soak Assistant as a separate movable dashboard card and a
+  full-width tool in the Klippertools view.
+- Added automatic Klipper temperature-sensor discovery, live heating and
+  stabilizing progress, regression slope, observed range, elapsed time, and
+  remaining-time estimates.
+- Added conservative full-window stability validation: temperature proximity,
+  drift, and oscillation must all remain inside their configured limits.
+- Added non-blocking monitoring and an optional blocking `THERMAL_SOAK_WAIT`
+  macro command with explicit cancellation and a hard timeout.
+- Added safe v0.2/v0.3 migration logic that preserves existing user tuning and
+  Service Manager history while installing the sixth Klipper extra.
+- Built and linted the native UI against Mainsail v2.17.0 and v2.18.2.
+
 ## 0.3.0 - 2026-08-02
 
 - Replaced the calendar-style Maintenance Tracker with a durable usage-based

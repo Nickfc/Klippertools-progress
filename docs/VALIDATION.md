@@ -1,8 +1,8 @@
 # Validation record
 
-Release 0.3.0 was validated on 2026-08-02.
+Release 0.8.0 was validated on 2026-08-02.
 
-- 43 Python model, parser, instrumentation, configuration, and integration
+- 86 Python model, parser, instrumentation, configuration, and integration
   tests passed.
 - Every Klipper extra, Moonraker component, and Python helper compiled with
   Python 3.
@@ -55,16 +55,30 @@ Release 0.3.0 was validated on 2026-08-02.
   first-one-wins due logic, baseline resets, exact confirmation for lifetime
   resets, live print/filament reconciliation, boot-local motion/probe counter
   reconciliation, and commanded XY/Z collection.
-- A deployed 0.2.1 fixture was transactionally upgraded to 0.3.0. The test
-  preserved a user edit in `klippertools.cfg`, added `[service_metrics]`,
-  installed the fifth Klipper extra, preserved the service data file
-  byte-for-byte, and passed full installed-file verification.
+- Thermal Soak tests cover full-window stability, target proximity, excessive
+  drift, oscillation range, timeout, cancellation, reset, ETA, and completion
+  learning.
+- A deployed 0.2.1 fixture was transactionally upgraded to 0.8.0. The test
+  preserved a user edit in `klippertools.cfg`, added `[service_metrics]` and
+  `[thermal_soak]`, installed all new Klipper extras, preserved and migrated
+  Service Manager data, and passed full installed-file verification.
 - The real CB1 target passed the v0.2.1 pre-upgrade verifier: install state and
   journal, four backend hashes and syntax, Moonraker checksum/include,
   Klipper include, and the complete Mainsail v2.17.0 manifest were all clean.
 - Moonraker controller tests confirm authenticated update and Service Manager
   endpoints, printing/paused update rejection, exact destructive-reset
   confirmation, and a second idle check before automatic service restart.
+- Calibration Center tests cover explicit confirmation, print-state and homing
+  interlocks, heater limits, runtime hardware discovery, review-only results,
+  and refusal to save or restart the printer automatically.
+- Tool Registry tests cover bounded profile validation, corrupt-file recovery,
+  idle-only installed-tool changes, usage/history retention, import/export, and
+  safe Nozzle Guard synchronization without rewriting printer configuration.
+- Printer Health Timeline tests cover bounded factual events, sanitization,
+  filtering, export, atomic storage, and exact confirmation before clearing.
+- Smart Maintenance tests cover opt-in behavior, evidence thresholds,
+  explainable suggestions, schema-1 migration, and the guarantee that advice
+  never changes service counters, baselines, intervals, or history silently.
 
 Hardware probing and resonance motion remain intentionally reserved for the
 documented attended acceptance checks on the target printer.

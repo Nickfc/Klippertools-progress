@@ -1,6 +1,6 @@
 {
   "name": "klippertools-suite",
-  "version": "0.3.0",
+  "version": "0.8.0",
   "released": "2026-08-02",
   "repository": "https://github.com/Nickfc/Klippertools-progress",
   "klipper_tested": [
@@ -17,7 +17,12 @@
     "start-flow",
     "service-manager",
     "service-metrics",
+    "thermal-soak-assistant",
     "motion-wizard",
+    "calibration-center",
+    "nozzle-tool-registry",
+    "printer-health-timeline",
+    "smart-maintenance",
     "transactional-updater"
   ],
   "default_eta_seed_points": 3,

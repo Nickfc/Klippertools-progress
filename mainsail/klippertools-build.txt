@@ -1,2 +1,1 @@
-Klippertools Suite UI 0.3.0
-Compatible with the Mainsail version named by the distribution archive.
+Klippertools Suite UI 0.8.0

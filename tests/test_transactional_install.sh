@@ -83,7 +83,7 @@ CFG
         MOONRAKER_DIR="$test_root/moonraker" \
         "$suite_copy/scripts/install.sh" >/dev/null
 
-    for backend in probe_progress nozzle_guard start_flow motion_wizard; do
+    for backend in probe_progress nozzle_guard start_flow motion_wizard service_metrics thermal_soak calibration_center; do
         [[ -f "$test_root/klipper/klippy/extras/$backend.py" ]] ||
             fail "$version did not install $backend.py"
     done
@@ -104,6 +104,9 @@ CFG
         MOONRAKER_DIR="$test_root/moonraker" \
         "$suite_copy/scripts/check-install.sh" >/dev/null
 
+    printf '{"sentinel":"service-history"}\n' > "$test_root/printer_data/klippertools-service.json"
+    printf '{"sentinel":"tool-history"}\n' > "$test_root/printer_data/klippertools-tools.json"
+    printf '{"sentinel":"timeline-history"}\n' > "$test_root/printer_data/klippertools-timeline.json"
     printf '{"theme":"changed-after-install"}\n' \
         > "$test_root/mainsail/config.json"
     "${runner[@]}" \
@@ -117,8 +120,10 @@ CFG
     grep -q '^previous-probe-backend$' \
         "$test_root/klipper/klippy/extras/probe_progress.py" ||
         fail "$version did not restore the previous backend"
-    [[ ! -e "$test_root/klipper/klippy/extras/nozzle_guard.py" ]] ||
-        fail "$version left a new backend behind"
+    for backend in nozzle_guard start_flow motion_wizard service_metrics thermal_soak calibration_center; do
+        [[ ! -e "$test_root/klipper/klippy/extras/$backend.py" ]] ||
+            fail "$version left $backend.py behind"
+    done
     grep -q '^previous-suite-config$' \
         "$test_root/printer_data/config/klippertools.cfg" ||
         fail "$version did not restore the previous suite config"
@@ -126,6 +131,12 @@ CFG
         fail "$version did not restore the original UI"
     grep -q 'changed-after-install' "$test_root/mainsail/config.json" ||
         fail "$version did not preserve the latest Mainsail settings"
+    grep -q 'service-history' "$test_root/printer_data/klippertools-service.json" ||
+        fail "$version removed persistent service data"
+    grep -q 'tool-history' "$test_root/printer_data/klippertools-tools.json" ||
+        fail "$version removed persistent tool registry data"
+    grep -q 'timeline-history' "$test_root/printer_data/klippertools-timeline.json" ||
+        fail "$version removed persistent health timeline data"
     [[ ! -e "$test_root/printer_data/klippertools-install-state" ]] ||
         fail "$version left an active install state behind"
     [[ ! -e "$test_root/klippertools" ]] ||

@@ -72,6 +72,57 @@ class NozzleGuardModelTest(unittest.TestCase):
         self.assertEqual(model.state, "mismatch")
         self.assertFalse(model.blocks_start())
 
+    def test_installed_registry_tool_becomes_active_reference(self):
+        model = NozzleGuardModel(0.4)
+        model.inspect("part.gcode", "; nozzle_diameter = 0.8\n")
+        self.assertTrue(model.blocks_start())
+        model.set_installed_tool(0.8, "hardened-08", "Hardened 0.8")
+        status = model.get_status()
+        self.assertEqual(status["state"], "match")
+        self.assertEqual(status["comparison_source"], "registry")
+        self.assertEqual(status["klipper_nozzle"], 0.4)
+        self.assertEqual(status["configured_nozzle"], 0.8)
+        self.assertFalse(model.blocks_start())
+
+    def test_clearing_registry_tool_restores_klipper_reference(self):
+        model = NozzleGuardModel(0.4)
+        model.inspect("part.gcode", "; nozzle_diameter = 0.8\n")
+        model.set_installed_tool(0.8, "hardened-08")
+        self.assertEqual(model.state, "match")
+        model.clear_installed_tool()
+        self.assertEqual(model.state, "mismatch")
+        self.assertEqual(model.get_status()["comparison_source"], "klipper")
+
+    def test_rejects_invalid_registry_profile(self):
+        model = NozzleGuardModel(0.4)
+        with self.assertRaises(ValueError):
+            model.set_installed_tool(0.8, "bad profile id")
+
+
+
+
+class NozzleGuardToolChangeSafetyTest(unittest.TestCase):
+    class Gcmd:
+        @staticmethod
+        def error(message):
+            return RuntimeError(message)
+
+    def test_tool_reference_change_is_blocked_while_printing_or_paused(self):
+        for state in ("printing", "paused"):
+            guard = NozzleGuard.__new__(NozzleGuard)
+            guard.reactor = type("Reactor", (), {"monotonic": lambda self: 12.0})()
+            guard.print_stats = type("PrintStats", (), {
+                "get_status": lambda self, eventtime, current=state: {"state": current}
+            })()
+            with self.assertRaisesRegex(RuntimeError, "cannot change"):
+                guard._assert_tool_change_idle(self.Gcmd())
+
+    def test_tool_reference_change_fails_closed_without_print_state(self):
+        guard = NozzleGuard.__new__(NozzleGuard)
+        guard.print_stats = None
+        with self.assertRaisesRegex(RuntimeError, "cannot verify"):
+            guard._assert_tool_change_idle(self.Gcmd())
+
 
 class NozzleGuardFileReadTest(unittest.TestCase):
     def test_scans_tail_without_loading_whole_gcode(self):

@@ -1,9 +1,9 @@
 # Klippertools Suite
 
 Klippertools adds a native Mainsail dashboard suite for Klipper printers. Probe
-Progress, UI Core, Nozzle Guard, StartFlow, Service Manager, and Motion Wizard
-are independent movable cards, and Service Manager also has a full sidebar
-view.
+Progress, Nozzle Guard, StartFlow, Service Manager, Motion Wizard, Thermal Soak,
+Calibration Center, Tool Registry, and Printer Health Timeline remain separately
+movable cards, with a combined full sidebar workspace.
 
 ## Included tools
 
@@ -33,6 +33,25 @@ view.
 - The installer instruments a compatible `PRINT_START` conservatively and can
   remove its markers exactly during uninstall.
 
+### Calibration Center
+
+- Orchestrates Klipper's own PID, bed-mesh, Z-offset, input-shaper, pressure-
+  advance, rotation-distance, and first-layer calibration workflows.
+- Shows prerequisites, current values, runtime hardware availability, and
+  attended heat or motion warnings before a workflow can begin.
+- Requires explicit confirmation and blocks while printing or paused.
+- Never runs `SAVE_CONFIG`, `RESTART`, or `FIRMWARE_RESTART` automatically.
+- Leaves permanent results pending for separate user review.
+
+### Nozzle & Tool Registry
+
+- Stores named nozzle/tool profiles with diameter, material, notes, optional
+  temperature reference, installed/retired state, usage, and change history.
+- Synchronizes the installed profile to Nozzle Guard in memory without silently
+  rewriting `[extruder] nozzle_diameter`.
+- Falls back to Klipper's configured nozzle if synchronization is unavailable.
+- Preserves registry data atomically across normal updates and uninstall.
+
 ### Service Manager
 
 - Adds a dedicated **Klippertools** view to Mainsail's left navigation.
@@ -43,14 +62,32 @@ view.
 - Shows every remaining interval, estimated due dates, green/amber/red state,
   negative overdue values, service instructions, and a compact next-service
   list on the dashboard.
-- Includes ten editable Ender 7 starting presets for rails, Z motion, belts,
-  extruder, hotend, heater wiring, probe, build plate, fans, and electrical
-  connectors.
+- Includes ten editable conservative starting presets for rails, Z motion,
+  belts, extruder, hotend, heater wiring, probe, build plate, fans, and
+  electrical connectors.
 - Shows idle-only reminder dialogs with Mark serviced, Snooze next print,
   Snooze 24h, and instructions.
 - Preserves service history, supports custom tasks and JSON import/export, and
   separates resetting recommended intervals from the strongly confirmed
   lifetime-counter reset.
+
+### Printer Health Timeline
+
+- Records explainable print, calibration, service, registry, updater,
+  configuration, and warning events with exact provenance.
+- Never stores G-code contents and never turns an observed state transition into
+  a claim that configuration was successfully saved.
+- Supports category/date filters, bounded retention, strong clear confirmation,
+  and local JSON export.
+
+### Smart Maintenance
+
+- Is opt-in and disabled by default.
+- Combines existing service countdowns with explicitly mapped warning/failure
+  evidence from Printer Health Timeline.
+- Shows evidence count, event types, confidence, and the exact reason for every
+  earlier-review suggestion.
+- Never changes intervals, baselines, counters, or service history silently.
 
 ### Motion Wizard
 
@@ -60,6 +97,17 @@ view.
 - Shows the current and newly calibrated shaper type and frequency for each
   axis.
 - Keeps `SAVE_CONFIG` behind a separate review-and-confirm step.
+
+### Thermal Soak Assistant
+
+- Watches any Klipper temperature sensor without changing its target.
+- Requires the complete configured stability window to remain within the
+  temperature, slope, and observed-range limits.
+- Shows live heating/stabilizing progress, drift, range, elapsed time, and ETA.
+- Learns a session-local completion estimate from earlier soaks without
+  writing printer configuration.
+- Offers non-blocking monitoring from its own movable card and an optional
+  blocking macro command with a hard timeout.
 
 ## Validated versions
 
@@ -108,7 +156,7 @@ replacing anything.
 To install a tag or review branch instead of `main`:
 
 ```bash
-KLIPPERTOOLS_REF=v0.3.0 bash /tmp/install-klippertools.sh
+KLIPPERTOOLS_REF=v0.8.0 bash /tmp/install-klippertools.sh
 ```
 
 After installation:
@@ -159,15 +207,15 @@ available, the identical path can be run over SSH:
 ## Manual release ZIP
 
 Download
-[`klippertools-suite-0.3.0.zip`](dist/klippertools-suite-0.3.0.zip)
+[`klippertools-suite-0.8.0.zip`](dist/klippertools-suite-0.8.0.zip)
 (with its optional
-[`SHA-256 sidecar`](dist/klippertools-suite-0.3.0.zip.sha256)), upload the ZIP
+[`SHA-256 sidecar`](dist/klippertools-suite-0.8.0.zip.sha256)), upload the ZIP
 under Mainsail's Config Files, then SSH into the CB1 as the normal Klipper
 user:
 
 ```bash
 mkdir -p ~/klippertools
-unzip -q ~/printer_data/config/klippertools-suite-0.3.0.zip -d ~/klippertools
+unzip -q ~/printer_data/config/klippertools-suite-0.8.0.zip -d ~/klippertools
 cd ~/klippertools
 sha256sum -c SHA256SUMS
 ./scripts/install.sh
@@ -215,6 +263,34 @@ sure no print is active, stay beside the printer, then follow the on-screen
 steps. Review both axis results before choosing Save and restart. Full safety
 details are in [docs/MOTION_WIZARD.md](docs/MOTION_WIZARD.md).
 
+### Thermal Soak
+
+Set the bed target normally, then start monitoring from the Thermal Soak card.
+The assistant does not heat or move the printer. For an optional blocking
+`PRINT_START` integration, follow [docs/THERMAL_SOAK.md](docs/THERMAL_SOAK.md).
+
+### Calibration Center
+
+Open the Calibration Center card while the printer is idle. Unsupported
+workflows must remain visible but disabled with an exact reason. Heat and motion
+workflows require explicit confirmation; stay beside the printer. Review any
+pending Klipper configuration changes separately.
+
+### Tool Registry
+
+Create a profile without installing it first. Installing or removing a profile
+is blocked while printing or paused. The Registry status must show whether
+Nozzle Guard is synchronized or safely using its Klipper-configuration fallback.
+See [docs/TOOL_REGISTRY.md](docs/TOOL_REGISTRY.md).
+
+### Printer Health Timeline and Smart Maintenance
+
+Timeline events show their exact source and can be exported as JSON. Smart
+Maintenance remains disabled until deliberately enabled and must show
+insufficient-data instead of a guessed recommendation. See
+[docs/HEALTH_TIMELINE.md](docs/HEALTH_TIMELINE.md) and
+[docs/SMART_MAINTENANCE.md](docs/SMART_MAINTENANCE.md).
+
 ## Configuration
 
 Defaults live in `~/printer_data/config/klippertools.cfg` after installation.
@@ -232,10 +308,17 @@ or temporarily rewrite that safety-critical setting.
 
 Service Manager settings are edited from the **Klippertools** item in
 Mainsail's left menu. Durable counters, task baselines, snoozes, and history are
-stored atomically in `~/printer_data/klippertools-service.json`. The file is
-outside the source checkout, survives one-click updates, and is retained by a
-normal uninstall so reinstalling can resume the history. XY and Z values are
-commanded Klipper toolhead distance, not encoder or other physical feedback.
+stored atomically in `~/printer_data/klippertools-service.json`. Tool Registry
+uses `~/printer_data/klippertools-tools.json`, and Printer Health Timeline uses
+`~/printer_data/klippertools-timeline.json`. These files live outside the source
+checkout, survive one-click updates, and are retained by normal uninstall. XY
+and Z values are commanded Klipper toolhead distance, not encoder or other
+physical feedback.
+
+Thermal Soak defaults are under `[thermal_soak]`. The defaults require five
+continuous minutes close to target, low regression slope, and a narrow
+observed temperature range. The card can override the target, window,
+tolerance, and maximum wait for one run without changing the config file.
 
 ## Verify or uninstall
 
@@ -268,9 +351,9 @@ python3 -m unittest discover -s tests -v
 tests/test_transactional_install.sh
 ```
 
-The `mainsail/` directory contains component source and exact patches for both
-supported Mainsail releases. Corresponding complete modified source archives
-are supplied under `source/`, with compiled UI archives under `dist/`.
+The `mainsail/` directory contains the suite component source. Corresponding
+complete modified source archives are supplied under `source/`, with compiled
+UI archives under `dist/`.
 
 ## License
 

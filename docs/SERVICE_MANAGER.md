@@ -1,6 +1,6 @@
 # Service Manager
 
-Klippertools 0.3.0 tracks maintenance from actual printer usage rather than
+Klippertools 0.3.0 and later track maintenance from actual printer usage rather than
 only a calendar reminder. Open **Klippertools** in Mainsail's left navigation
 to see lifetime counters, the service schedule, history, presets, and data
 controls.
@@ -56,3 +56,16 @@ The supplied intervals are conservative editable starting points, not printer
 or component manufacturer requirements. Inspect sooner after a crash, unusual
 noise, contamination, looseness, overheating, wiring damage, or changed print
 quality.
+
+## Smart Maintenance
+
+Smart Maintenance is disabled by default. When enabled, each recommended task
+may compare its normal countdown progress with explicitly mapped warning and
+failure events from Printer Health Timeline. The status always includes the
+normal `base_progress`, `base_state`, and `base_due` values separately from the
+advisory result.
+
+A suggestion states its event count, types, confidence, evidence window, and
+maximum earlier-review percentage. It never rewrites the task's thresholds,
+baseline, service timestamp, or lifetime counters. See
+[SMART_MAINTENANCE.md](SMART_MAINTENANCE.md).

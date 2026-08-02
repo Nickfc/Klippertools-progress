@@ -1,8 +1,17 @@
-name: Validate
+name: Validate v0.8
 
 on:
-  push:
+  workflow_dispatch:
   pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: v08-validate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -18,8 +27,7 @@ jobs:
         run: python3 -m unittest discover -s tests -v
 
       - name: Check Python syntax
-        run: |
-          python3 -m py_compile klipper/*.py moonraker/*.py scripts/*.py tests/*.py
+        run: python3 -m py_compile klipper/*.py moonraker/*.py scripts/*.py tests/*.py
 
       - name: Check shell syntax
         run: |
@@ -33,7 +41,8 @@ jobs:
             scripts/update-online.sh \
             tests/test_transactional_install.sh \
             tests/test_lifecycle_safety.sh \
-            tests/test_online_lifecycle.sh
+            tests/test_online_lifecycle.sh \
+            scripts/build-mainsail-v0.8.0.sh
 
       - name: Test transactional install and uninstall
         run: tests/test_transactional_install.sh
@@ -51,5 +60,5 @@ jobs:
           unzip -tq dist/mainsail-v2.18.2-klippertools.zip
           unzip -tq source/mainsail-v2.17.0-klippertools-source.zip
           unzip -tq source/mainsail-v2.18.2-klippertools-source.zip
-          unzip -tq dist/klippertools-suite-0.3.0.zip
-          (cd dist && sha256sum -c klippertools-suite-0.3.0.zip.sha256)
+          unzip -tq dist/klippertools-suite-0.8.0.zip
+          (cd dist && sha256sum -c klippertools-suite-0.8.0.zip.sha256)
