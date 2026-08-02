@@ -1,8 +1,9 @@
 # Klippertools Suite
 
-Klippertools adds a native Mainsail dashboard suite for Klipper printers. The
-Probe Progress matrix remains directly under Console, followed by one compact
-Klippertools card with Nozzle Guard, StartFlow, Maintenance, and Motion tabs.
+Klippertools adds a native Mainsail dashboard suite for Klipper printers. Probe
+Progress, UI Core, Nozzle Guard, StartFlow, Service Manager, and Motion Wizard
+are independent movable cards, and Service Manager also has a full sidebar
+view.
 
 ## Included tools
 
@@ -32,13 +33,24 @@ Klippertools card with Nozzle Guard, StartFlow, Maintenance, and Motion tabs.
 - The installer instruments a compatible `PRINT_START` conservatively and can
   remove its markers exactly during uninstall.
 
-### Maintenance Tracker
+### Service Manager
 
-- Shows repeating maintenance tasks and the most urgent task first.
-- Tracks print hours, filament metres, calendar days, or any combination.
-- Reuses Mainsail's existing Moonraker maintenance database and dialogs, so
-  tasks remain compatible with Mainsail's History page.
-- Supports editable intervals, notes, completion history, and repeating tasks.
+- Adds a dedicated **Klippertools** view to Mainsail's left navigation.
+- Tracks print time, filament, prints started, calendar age, commanded XY and Z
+  travel, hotend and bed heater-on time, and probe touches.
+- Gives every task any number of independent countdowns; the first countdown
+  to reach zero makes the task due.
+- Shows every remaining interval, estimated due dates, green/amber/red state,
+  negative overdue values, service instructions, and a compact next-service
+  list on the dashboard.
+- Includes ten editable Ender 7 starting presets for rails, Z motion, belts,
+  extruder, hotend, heater wiring, probe, build plate, fans, and electrical
+  connectors.
+- Shows idle-only reminder dialogs with Mark serviced, Snooze next print,
+  Snooze 24h, and instructions.
+- Preserves service history, supports custom tasks and JSON import/export, and
+  separates resetting recommended intervals from the strongly confirmed
+  lifetime-counter reset.
 
 ### Motion Wizard
 
@@ -96,7 +108,7 @@ replacing anything.
 To install a tag or review branch instead of `main`:
 
 ```bash
-KLIPPERTOOLS_REF=v0.2.1 bash /tmp/install-klippertools.sh
+KLIPPERTOOLS_REF=v0.3.0 bash /tmp/install-klippertools.sh
 ```
 
 After installation:
@@ -147,15 +159,15 @@ available, the identical path can be run over SSH:
 ## Manual release ZIP
 
 Download
-[`klippertools-suite-0.2.1.zip`](dist/klippertools-suite-0.2.1.zip)
+[`klippertools-suite-0.3.0.zip`](dist/klippertools-suite-0.3.0.zip)
 (with its optional
-[`SHA-256 sidecar`](dist/klippertools-suite-0.2.1.zip.sha256)), upload the ZIP
+[`SHA-256 sidecar`](dist/klippertools-suite-0.3.0.zip.sha256)), upload the ZIP
 under Mainsail's Config Files, then SSH into the CB1 as the normal Klipper
 user:
 
 ```bash
 mkdir -p ~/klippertools
-unzip -q ~/printer_data/config/klippertools-suite-0.2.1.zip -d ~/klippertools
+unzip -q ~/printer_data/config/klippertools-suite-0.3.0.zip -d ~/klippertools
 cd ~/klippertools
 sha256sum -c SHA256SUMS
 ./scripts/install.sh
@@ -217,6 +229,13 @@ tolerance: 0.01
 Changing Klipper's configured nozzle still requires updating
 `[extruder] nozzle_diameter` and restarting Klipper; Nozzle Guard does not hide
 or temporarily rewrite that safety-critical setting.
+
+Service Manager settings are edited from the **Klippertools** item in
+Mainsail's left menu. Durable counters, task baselines, snoozes, and history are
+stored atomically in `~/printer_data/klippertools-service.json`. The file is
+outside the source checkout, survives one-click updates, and is retained by a
+normal uninstall so reinstalling can resume the history. XY and Z values are
+commanded Klipper toolhead distance, not encoder or other physical feedback.
 
 ## Verify or uninstall
 

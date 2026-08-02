@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.3.0 - 2026-08-02
+
+- Replaced the calendar-style Maintenance Tracker with a durable usage-based
+  Service Manager and a dedicated Mainsail sidebar view.
+- Added lifetime counters for print time, filament, prints, commanded XY/Z
+  travel, hotend/bed heater time, probe touches, and calendar age.
+- Added ten editable Ender 7 recommended service presets, custom tasks,
+  multi-threshold "first one wins" countdowns, overdue values, estimated due
+  dates, service instructions, history, import/export, and reset controls.
+- Added idle-only reminders with mark-serviced and two snooze choices.
+- Added a boot-local Klipper metric collector reconciled into an atomic
+  Moonraker data file with bounded writes and power-safe replacement.
+- Added a v0.2.1 migration that preserves user tuning while enabling the new
+  collector, preserves newly encountered pre-existing extras for uninstall,
+  and retains Service Manager data during normal uninstall.
+- Built and linted the native UI against Mainsail v2.17.0 and v2.18.2.
+
 ## 0.2.1 - 2026-08-01
 
 - Split Probe Progress, UI Core, Nozzle Guard, StartFlow, Maintenance Tracker,

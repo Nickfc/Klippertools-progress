@@ -7,7 +7,7 @@
 import math
 
 
-PLUGIN_VERSION = "0.2.1"
+PLUGIN_VERSION = "0.3.0"
 DEFAULT_STAGES = [
     ("bed_heat", "Heating bed", 120.0),
     ("homing", "Homing", 35.0),

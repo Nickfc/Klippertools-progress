@@ -30,9 +30,15 @@ import uuid
 import zipfile
 
 
-VERSION = "0.2.1"
+VERSION = "0.3.0"
 SCHEMA = 2
-EXTRA_NAMES = ("probe_progress", "nozzle_guard", "start_flow", "motion_wizard")
+EXTRA_NAMES = (
+    "probe_progress",
+    "nozzle_guard",
+    "start_flow",
+    "motion_wizard",
+    "service_metrics",
+)
 ACTIVE_PRINT_STATES = {"printing", "paused"}
 SAFE_PRINT_STATES = {"standby", "complete", "cancelled", "error"}
 MOONRAKER_INCLUDE = "[include klippertools-moonraker.conf]"
@@ -149,7 +155,8 @@ def parse_legacy_state(path: Path) -> dict:
     extras = {}
     for name in EXTRA_NAMES:
         key = f"EXTRA_EXISTED_{name.upper()}"
-        extras[name] = values.get(key, "0") == "1"
+        if key in values:
+            extras[name] = values[key] == "1"
     backup_dir = Path(values["BACKUP_DIR"])
     ui_backup = backup_dir / "mainsail"
     return {
@@ -769,6 +776,19 @@ def ensure_original_backup_for_update(paths: Paths, state: dict) -> tuple[dict, 
     owned = dict(state.get("owned_changes", {}))
     initial_backup = Path(state["backup_dir"])
 
+    # New suite releases may add a Klipper extra. Preserve any unrelated file
+    # already using that name in the original install backup before replacing
+    # it, so a future uninstall still restores the true pre-suite host.
+    for name in EXTRA_NAMES:
+        if name in originals["extras"]:
+            continue
+        target = paths.klipper_dir / "klippy" / "extras" / f"{name}.py"
+        backup = initial_backup / "originals" / "extras" / f"{name}.py"
+        existed = target.exists() or target.is_symlink()
+        if existed and not backup.exists():
+            atomic_copy(target, backup)
+        originals["extras"][name] = existed
+
     # 0.2.0 did not manage Moonraker.  Capture its untouched configuration in
     # the original install backup before 0.2.1 adds the component/include, so a
     # later uninstall still returns to the true pre-suite state.
@@ -793,6 +813,22 @@ def ensure_original_backup_for_update(paths: Paths, state: dict) -> tuple[dict, 
         originals["moonraker_suite_config"] = existed
     owned.setdefault("moonraker_include", False)
     return originals, owned
+
+
+def ensure_service_metrics_config(paths: Paths) -> bool:
+    """Add the v0.3 collector section without replacing user tuning."""
+    text = paths.suite_cfg.read_text(encoding="utf-8")
+    if any(line.strip() == "[service_metrics]" for line in text.splitlines()):
+        return False
+    addition = (
+        "\n[service_metrics]\n"
+        "# Motion distance is commanded travel reported by Klipper, not encoder or\n"
+        "# other closed-loop physical feedback. Persistent counters and service\n"
+        "# intervals are configured in Mainsail's Klippertools view.\n"
+    )
+    mode = paths.suite_cfg.stat().st_mode & 0o777
+    atomic_write_bytes(paths.suite_cfg, (text.rstrip() + "\n" + addition).encode(), mode=mode)
+    return True
 
 
 def update(paths: Paths, offline: bool, source_target: Path) -> None:
@@ -852,6 +888,7 @@ def update(paths: Paths, offline: bool, source_target: Path) -> None:
         checkpoint("after_backends")
         if not paths.suite_cfg.exists():
             atomic_copy(paths.suite_root / "config" / "klippertools.cfg", paths.suite_cfg)
+        ensure_service_metrics_config(paths)
         atomic_copy(paths.suite_root / "moonraker" / "klippertools.py", paths.moonraker_component)
         atomic_copy(
             paths.suite_root / "config" / "klippertools-moonraker.conf",
@@ -1155,6 +1192,10 @@ def verify(paths: Paths) -> None:
 
     if not paths.suite_cfg.is_file():
         problems.append("suite configuration is missing")
+    elif "[service_metrics]" not in {
+        line.strip() for line in paths.suite_cfg.read_text(encoding="utf-8").splitlines()
+    }:
+        problems.append("suite configuration does not enable service_metrics")
     printer_text = paths.printer_cfg.read_text(encoding="utf-8") if paths.printer_cfg.is_file() else ""
     if "[include klippertools.cfg]" not in {line.strip() for line in printer_text.splitlines()}:
         problems.append("printer.cfg does not include klippertools.cfg")
@@ -1176,7 +1217,7 @@ def verify(paths: Paths) -> None:
             print(f"[fail] {problem}")
         fail(f"installation verification failed with {len(problems)} problem(s)")
     print(f"[ok] Klippertools Suite {VERSION} state and transaction journal")
-    print("[ok] four Klipper backends: checksums and Python syntax")
+    print("[ok] five Klipper backends: checksums and Python syntax")
     print("[ok] Moonraker updater: checksum, Python syntax, and include")
     print("[ok] Klipper configuration include")
     print(f"[ok] complete Mainsail {version} file manifest")

@@ -65,9 +65,10 @@ crash_install_root="$(mktemp -d /tmp/klippertools-safety-crash-install.XXXXXX)"
 crash_update_root="$(mktemp -d /tmp/klippertools-safety-crash-update.XXXXXX)"
 crash_uninstall_root="$(mktemp -d /tmp/klippertools-safety-crash-uninstall.XXXXXX)"
 legacy_update_root="$(mktemp -d /tmp/klippertools-safety-legacy-update.XXXXXX)"
+upgrade_021_root="$(mktemp -d /tmp/klippertools-safety-upgrade-021.XXXXXX)"
 cleanup() {
     rm -rf -- "$normal_root" "$crash_install_root" "$crash_update_root" \
-        "$crash_uninstall_root" "$legacy_update_root"
+        "$crash_uninstall_root" "$legacy_update_root" "$upgrade_021_root"
 }
 trap cleanup EXIT
 
@@ -130,6 +131,39 @@ cmp -s "$legacy_update_root/moonraker.conf.original" \
     fail "legacy migration uninstall did not restore moonraker.conf"
 grep -q '^original-ui$' "$legacy_update_root/mainsail/index.html" ||
     fail "legacy migration uninstall did not restore Mainsail"
+
+# The exact production path from 0.2.1 to 0.3.0 preserves user tuning and
+# service data while adding the fifth Klipper collector section.
+make_fixture "$upgrade_021_root"
+rm -rf -- "$upgrade_021_root/klippertools"
+mkdir -p "$upgrade_021_root/klippertools"
+unzip -q "$SUITE_ROOT/dist/klippertools-suite-0.2.1.zip" \
+    -d "$upgrade_021_root/klippertools"
+run_env "$upgrade_021_root" \
+    "$upgrade_021_root/klippertools/scripts/install.sh" >/dev/null
+printf '\n# retained 0.2.1 user tuning\n' \
+    >> "$upgrade_021_root/printer_data/config/klippertools.cfg"
+printf '{"sentinel":"preserve-service-data"}\n' \
+    > "$upgrade_021_root/printer_data/klippertools-service.json"
+service_data_before="$(sha256sum "$upgrade_021_root/printer_data/klippertools-service.json" | cut -d' ' -f1)"
+mkdir -p "$upgrade_021_root/update-stage"
+cp -a "$SUITE_ROOT" "$upgrade_021_root/update-stage/repository"
+run_env "$upgrade_021_root" \
+    "$upgrade_021_root/update-stage/repository/scripts/update.sh" \
+    --source-target "$upgrade_021_root/klippertools" >/dev/null
+grep -q '^\[service_metrics\]$' \
+    "$upgrade_021_root/printer_data/config/klippertools.cfg" ||
+    fail "0.2.1 upgrade did not enable service_metrics"
+grep -q 'retained 0.2.1 user tuning' \
+    "$upgrade_021_root/printer_data/config/klippertools.cfg" ||
+    fail "0.2.1 upgrade overwrote user tuning"
+[[ -f "$upgrade_021_root/klipper/klippy/extras/service_metrics.py" ]] ||
+    fail "0.2.1 upgrade did not install service_metrics.py"
+service_data_after="$(sha256sum "$upgrade_021_root/printer_data/klippertools-service.json" | cut -d' ' -f1)"
+[[ "$service_data_before" == "$service_data_after" ]] ||
+    fail "0.2.1 upgrade changed persistent service data"
+run_env "$upgrade_021_root" \
+    "$upgrade_021_root/klippertools/scripts/check-install.sh" >/dev/null
 
 # Update runs from a verified staging tree, preserves user configuration, and
 # replaces the source checkout only after all deployed files are ready.

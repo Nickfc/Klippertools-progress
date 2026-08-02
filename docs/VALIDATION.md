@@ -1,8 +1,8 @@
 # Validation record
 
-Release 0.2.1 was validated on 2026-08-01.
+Release 0.3.0 was validated on 2026-08-02.
 
-- 37 Python model, parser, instrumentation, configuration, and integration
+- 43 Python model, parser, instrumentation, configuration, and integration
   tests passed.
 - Every Klipper extra, Moonraker component, and Python helper compiled with
   Python 3.
@@ -51,9 +51,20 @@ Release 0.2.1 was validated on 2026-08-01.
   uninstall with source archival, and immediate clean online reinstall.
 - Both compiled UI builds include the authenticated update dialog and passed
   their respective production Vite builds.
-- Moonraker controller tests confirm that only GET status and POST update
-  endpoints are registered, both printing and paused states are rejected, and
-  idle state is checked again before automatic service restart.
+- Service Manager tests cover all ten recommended tasks, multi-threshold
+  first-one-wins due logic, baseline resets, exact confirmation for lifetime
+  resets, live print/filament reconciliation, boot-local motion/probe counter
+  reconciliation, and commanded XY/Z collection.
+- A deployed 0.2.1 fixture was transactionally upgraded to 0.3.0. The test
+  preserved a user edit in `klippertools.cfg`, added `[service_metrics]`,
+  installed the fifth Klipper extra, preserved the service data file
+  byte-for-byte, and passed full installed-file verification.
+- The real CB1 target passed the v0.2.1 pre-upgrade verifier: install state and
+  journal, four backend hashes and syntax, Moonraker checksum/include,
+  Klipper include, and the complete Mainsail v2.17.0 manifest were all clean.
+- Moonraker controller tests confirm authenticated update and Service Manager
+  endpoints, printing/paused update rejection, exact destructive-reset
+  confirmation, and a second idle check before automatic service restart.
 
 Hardware probing and resonance motion remain intentionally reserved for the
 documented attended acceptance checks on the target printer.

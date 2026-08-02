@@ -1,7 +1,7 @@
 {
   "name": "klippertools-suite",
-  "version": "0.2.1",
-  "released": "2026-08-01",
+  "version": "0.3.0",
+  "released": "2026-08-02",
   "repository": "https://github.com/Nickfc/Klippertools-progress",
   "klipper_tested": [
     "v0.13.0-660-g616242d4",
@@ -15,7 +15,8 @@
     "probe-progress",
     "nozzle-guard",
     "start-flow",
-    "maintenance-tracker",
+    "service-manager",
+    "service-metrics",
     "motion-wizard",
     "transactional-updater"
   ],
