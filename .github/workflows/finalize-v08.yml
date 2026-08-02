@@ -13,7 +13,7 @@ permissions:
 
 concurrency:
   group: klippertools-v08-finalize
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   finalize:
@@ -61,6 +61,11 @@ jobs:
           }
           trap report_failure EXIT
           exec > >(tee "$log") 2>&1
+
+          git config user.name 'Klippertools Release Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git commit --allow-empty -m 'ci: cumulative v0.8 finalizer started'
+          git push origin HEAD:agent/calibration-center-v0.5.0
 
           cat build/v08-source-overlay.part* | base64 --decode > "$RUNNER_TEMP/v08-source-overlay.tar.xz"
           echo 'a8b3d23802ddecf164553f17cef934fee063600a9aa24e414854b13affd021dc  '"$RUNNER_TEMP/v08-source-overlay.tar.xz" | sha256sum -c -
