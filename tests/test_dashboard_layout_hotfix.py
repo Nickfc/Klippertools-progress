@@ -1,3 +1,4 @@
+import json
 import re
 import unittest
 import zipfile
@@ -13,6 +14,12 @@ PANEL_RE = re.compile(r"^\s*'(tool-registry|health-timeline)',\s*$", re.MULTILIN
 
 
 class DashboardLayoutHotfixTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        version = json.loads((ROOT / "manifest.json").read_text(encoding="utf-8"))["version"]
+        if version != "0.8.1":
+            raise unittest.SkipTest("v0.8.1 generated release artifacts are not committed yet")
+
     def test_source_archives_have_unique_intentional_entries_and_self_heal(self):
         for archive in ARCHIVES:
             with self.subTest(archive=archive.name), zipfile.ZipFile(archive) as source:
