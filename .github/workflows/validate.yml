@@ -51,5 +51,5 @@ jobs:
           unzip -tq dist/mainsail-v2.18.2-klippertools.zip
           unzip -tq source/mainsail-v2.17.0-klippertools-source.zip
           unzip -tq source/mainsail-v2.18.2-klippertools-source.zip
-          unzip -tq dist/klippertools-suite-0.2.1.zip
-          (cd dist && sha256sum -c klippertools-suite-0.2.1.zip.sha256)
+          unzip -tq dist/klippertools-suite-0.3.0.zip
+          (cd dist && sha256sum -c klippertools-suite-0.3.0.zip.sha256)
