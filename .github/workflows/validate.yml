@@ -141,10 +141,6 @@ jobs:
 
           path = Path('build/finalize-v08.sh')
           text = path.read_text(encoding='utf-8')
-          self_extract = 'cat build/v08-source-overlay.part* | base64 --decode | tar -xJ\n'
-          if text.count(self_extract) != 1:
-              raise SystemExit('unexpected finalizer self-extraction layout')
-          text = text.replace(self_extract, '', 1)
           needle = '''  )
             patch_file="$GITHUB_WORKSPACE/mainsail/mainsail-${version}-v0.8.0.patch"
           '''
