@@ -1,4 +1,4 @@
-name: Build v0.8 Mainsail
+name: Build v0.8.1 Mainsail hotfix
 
 on:
   workflow_dispatch:
@@ -7,28 +7,142 @@ on:
       - main
 
 concurrency:
-  group: v08-build-${{ github.event.pull_request.number || github.ref }}
+  group: v081-build-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository
+      - name: Check out pull-request branch
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+
+      - name: Detect generated release commit
+        id: guard
+        shell: bash
+        run: |
+          if git log -1 --pretty=%B | grep -Fq '[generated v0.8.1]'; then
+            echo 'skip=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'skip=false' >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Use Node 20
+        if: steps.guard.outputs.skip != 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Build and validate both Mainsail versions
-        run: scripts/build-mainsail-v0.8.0.sh "$RUNNER_TEMP/klippertools-v0.8.0-mainsail"
-      - name: Upload version-matched builds
+
+      - name: Repair source archives and release metadata
+        if: steps.guard.outputs.skip != 'true'
+        run: python3 scripts/prepare-v0.8.1.py
+
+      - name: Regenerate cumulative Mainsail patches
+        if: steps.guard.outputs.skip != 'true'
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          patch_work="$RUNNER_TEMP/klippertools-v081-patches"
+          rm -rf "$patch_work"
+          mkdir -p "$patch_work"
+
+          for version in v2.17.0 v2.18.2; do
+            version_work="$patch_work/$version"
+            mkdir -p "$version_work"
+            git clone --quiet --depth 1 --branch "$version" https://github.com/mainsail-crew/mainsail.git "$version_work/a"
+            rm -rf "$version_work/a/.git" "$version_work/a/node_modules" "$version_work/a/dist"
+            mkdir -p "$version_work/b"
+            unzip -q "source/mainsail-${version}-klippertools-source.zip" -d "$version_work/b"
+            rm -rf "$version_work/b/.git" "$version_work/b/node_modules" "$version_work/b/dist"
+
+            patch_file="$GITHUB_WORKSPACE/mainsail/mainsail-${version}-v0.8.1.patch"
+            set +e
+            (cd "$version_work" && diff -ruN --exclude=.git --exclude=node_modules --exclude=dist a b) > "$patch_file"
+            status=$?
+            set -e
+            if [[ "$status" -ne 1 ]]; then
+              echo "expected a non-empty cumulative patch for $version, diff status=$status" >&2
+              exit 1
+            fi
+            cp "$patch_file" "mainsail/mainsail-${version}.patch"
+          done
+
+      - name: Build corrected Mainsail archives
+        if: steps.guard.outputs.skip != 'true'
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          output="$RUNNER_TEMP/klippertools-v081-mainsail"
+          bash scripts/build-mainsail-v0.8.0.sh "$output"
+          cp "$output/mainsail-v2.17.0-klippertools.zip" dist/
+          cp "$output/mainsail-v2.18.2-klippertools.zip" dist/
+
+      - name: Generate checksums and complete suite archive
+        if: steps.guard.outputs.skip != 'true'
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 scripts/generate_checksums.py
+          rm -f dist/klippertools-suite-0.8.1.zip dist/klippertools-suite-0.8.1.zip.sha256
+          {
+            echo ./SHA256SUMS
+            awk '{print $2}' SHA256SUMS
+          } | zip -q dist/klippertools-suite-0.8.1.zip -@
+          (
+            cd dist
+            sha256sum klippertools-suite-0.8.1.zip > klippertools-suite-0.8.1.zip.sha256
+          )
+
+      - name: Validate repaired release
+        if: steps.guard.outputs.skip != 'true'
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 -m unittest discover -s tests -v
+          python3 -m py_compile klipper/*.py moonraker/*.py scripts/*.py tests/*.py
+          bash -n install-online.sh scripts/*.sh tests/*.sh
+          sha256sum -c SHA256SUMS
+          unzip -tq dist/mainsail-v2.17.0-klippertools.zip
+          unzip -tq dist/mainsail-v2.18.2-klippertools.zip
+          unzip -tq source/mainsail-v2.17.0-klippertools-source.zip
+          unzip -tq source/mainsail-v2.18.2-klippertools-source.zip
+          unzip -tq dist/klippertools-suite-0.8.1.zip
+          (cd dist && sha256sum -c klippertools-suite-0.8.1.zip.sha256)
+
+      - name: Commit generated v0.8.1 release
+        if: steps.guard.outputs.skip != 'true'
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No generated changes"
+            exit 0
+          fi
+          git commit -m "Build Klippertools v0.8.1 dashboard hotfix [generated v0.8.1]"
+          git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
+
+      - name: Upload generated release bundle
+        if: steps.guard.outputs.skip != 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: klippertools-v0.8.0-mainsail-${{ github.sha }}
-          path: ${{ runner.temp }}/klippertools-v0.8.0-mainsail/
+          name: klippertools-v0.8.1-release-${{ github.sha }}
+          path: |
+            dist/klippertools-suite-0.8.1.zip
+            dist/klippertools-suite-0.8.1.zip.sha256
+            dist/mainsail-v2.17.0-klippertools.zip
+            dist/mainsail-v2.18.2-klippertools.zip
+            source/mainsail-v2.17.0-klippertools-source.zip
+            source/mainsail-v2.18.2-klippertools-source.zip
+            mainsail/mainsail-v2.17.0-v0.8.1.patch
+            mainsail/mainsail-v2.18.2-v0.8.1.patch
           if-no-files-found: error
           retention-days: 3
