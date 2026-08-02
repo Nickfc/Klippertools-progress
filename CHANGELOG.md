@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.4.0 - 2026-08-02
+
+- Added Thermal Soak Assistant as a separate movable dashboard card and a
+  full-width tool in the Klippertools view.
+- Added automatic Klipper temperature-sensor discovery, live heating and
+  stabilizing progress, regression slope, observed range, elapsed time, and
+  remaining-time estimates.
+- Added conservative full-window stability validation: temperature proximity,
+  drift, and oscillation must all remain inside their configured limits.
+- Added non-blocking monitoring and an optional blocking `THERMAL_SOAK_WAIT`
+  macro command with explicit cancellation and a hard timeout.
+- Added safe v0.2/v0.3 migration logic that preserves existing user tuning and
+  Service Manager history while installing the sixth Klipper extra.
+- Built and linted the native UI against Mainsail v2.17.0 and v2.18.2.
+
 ## 0.3.0 - 2026-08-02
 
 - Replaced the calendar-style Maintenance Tracker with a durable usage-based

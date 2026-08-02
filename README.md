@@ -1,9 +1,9 @@
 # Klippertools Suite
 
 Klippertools adds a native Mainsail dashboard suite for Klipper printers. Probe
-Progress, UI Core, Nozzle Guard, StartFlow, Service Manager, and Motion Wizard
-are independent movable cards, and Service Manager also has a full sidebar
-view.
+Progress, UI Core, Nozzle Guard, StartFlow, Service Manager, Motion Wizard, and
+Thermal Soak are independent movable cards, and Service Manager also has a
+full sidebar view.
 
 ## Included tools
 
@@ -61,6 +61,17 @@ view.
   axis.
 - Keeps `SAVE_CONFIG` behind a separate review-and-confirm step.
 
+### Thermal Soak Assistant
+
+- Watches any Klipper temperature sensor without changing its target.
+- Requires the complete configured stability window to remain within the
+  temperature, slope, and observed-range limits.
+- Shows live heating/stabilizing progress, drift, range, elapsed time, and ETA.
+- Learns a session-local completion estimate from earlier soaks without
+  writing printer configuration.
+- Offers non-blocking monitoring from its own movable card and an optional
+  blocking macro command with a hard timeout.
+
 ## Validated versions
 
 - Klipper v0.13.0-660-g616242d4
@@ -108,7 +119,7 @@ replacing anything.
 To install a tag or review branch instead of `main`:
 
 ```bash
-KLIPPERTOOLS_REF=v0.3.0 bash /tmp/install-klippertools.sh
+KLIPPERTOOLS_REF=v0.4.0 bash /tmp/install-klippertools.sh
 ```
 
 After installation:
@@ -159,15 +170,15 @@ available, the identical path can be run over SSH:
 ## Manual release ZIP
 
 Download
-[`klippertools-suite-0.3.0.zip`](dist/klippertools-suite-0.3.0.zip)
+[`klippertools-suite-0.4.0.zip`](dist/klippertools-suite-0.4.0.zip)
 (with its optional
-[`SHA-256 sidecar`](dist/klippertools-suite-0.3.0.zip.sha256)), upload the ZIP
+[`SHA-256 sidecar`](dist/klippertools-suite-0.4.0.zip.sha256)), upload the ZIP
 under Mainsail's Config Files, then SSH into the CB1 as the normal Klipper
 user:
 
 ```bash
 mkdir -p ~/klippertools
-unzip -q ~/printer_data/config/klippertools-suite-0.3.0.zip -d ~/klippertools
+unzip -q ~/printer_data/config/klippertools-suite-0.4.0.zip -d ~/klippertools
 cd ~/klippertools
 sha256sum -c SHA256SUMS
 ./scripts/install.sh
@@ -215,6 +226,12 @@ sure no print is active, stay beside the printer, then follow the on-screen
 steps. Review both axis results before choosing Save and restart. Full safety
 details are in [docs/MOTION_WIZARD.md](docs/MOTION_WIZARD.md).
 
+### Thermal Soak
+
+Set the bed target normally, then start monitoring from the Thermal Soak card.
+The assistant does not heat or move the printer. For an optional blocking
+`PRINT_START` integration, follow [docs/THERMAL_SOAK.md](docs/THERMAL_SOAK.md).
+
 ## Configuration
 
 Defaults live in `~/printer_data/config/klippertools.cfg` after installation.
@@ -236,6 +253,11 @@ stored atomically in `~/printer_data/klippertools-service.json`. The file is
 outside the source checkout, survives one-click updates, and is retained by a
 normal uninstall so reinstalling can resume the history. XY and Z values are
 commanded Klipper toolhead distance, not encoder or other physical feedback.
+
+Thermal Soak defaults are under `[thermal_soak]`. The defaults require five
+continuous minutes close to target, low regression slope, and a narrow
+observed temperature range. The card can override the target, window,
+tolerance, and maximum wait for one run without changing the config file.
 
 ## Verify or uninstall
 
@@ -268,9 +290,9 @@ python3 -m unittest discover -s tests -v
 tests/test_transactional_install.sh
 ```
 
-The `mainsail/` directory contains component source and exact patches for both
-supported Mainsail releases. Corresponding complete modified source archives
-are supplied under `source/`, with compiled UI archives under `dist/`.
+The `mainsail/` directory contains the suite component source. Corresponding
+complete modified source archives are supplied under `source/`, with compiled
+UI archives under `dist/`.
 
 ## License
 

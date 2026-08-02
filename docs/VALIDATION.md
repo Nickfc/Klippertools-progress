@@ -1,8 +1,8 @@
 # Validation record
 
-Release 0.3.0 was validated on 2026-08-02.
+Release 0.4.0 was validated on 2026-08-02.
 
-- 43 Python model, parser, instrumentation, configuration, and integration
+- 49 Python model, parser, instrumentation, configuration, and integration
   tests passed.
 - Every Klipper extra, Moonraker component, and Python helper compiled with
   Python 3.
@@ -55,10 +55,13 @@ Release 0.3.0 was validated on 2026-08-02.
   first-one-wins due logic, baseline resets, exact confirmation for lifetime
   resets, live print/filament reconciliation, boot-local motion/probe counter
   reconciliation, and commanded XY/Z collection.
-- A deployed 0.2.1 fixture was transactionally upgraded to 0.3.0. The test
-  preserved a user edit in `klippertools.cfg`, added `[service_metrics]`,
-  installed the fifth Klipper extra, preserved the service data file
-  byte-for-byte, and passed full installed-file verification.
+- Thermal Soak tests cover full-window stability, target proximity, excessive
+  drift, oscillation range, timeout, cancellation, reset, ETA, and completion
+  learning.
+- A deployed 0.2.1 fixture was transactionally upgraded to 0.4.0. The test
+  preserved a user edit in `klippertools.cfg`, added `[service_metrics]` and
+  `[thermal_soak]`, installed both new Klipper extras, preserved the service
+  data file byte-for-byte, and passed full installed-file verification.
 - The real CB1 target passed the v0.2.1 pre-upgrade verifier: install state and
   journal, four backend hashes and syntax, Moonraker checksum/include,
   Klipper include, and the complete Mainsail v2.17.0 manifest were all clean.

@@ -1,6 +1,6 @@
 # Service Manager
 
-Klippertools 0.3.0 tracks maintenance from actual printer usage rather than
+Klippertools 0.3.0 and later track maintenance from actual printer usage rather than
 only a calendar reminder. Open **Klippertools** in Mainsail's left navigation
 to see lifetime counters, the service schedule, history, presets, and data
 controls.
