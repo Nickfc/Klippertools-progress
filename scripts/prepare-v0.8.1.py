@@ -2,9 +2,9 @@
 """Prepare the Klippertools v0.8.1 dashboard-layout hotfix.
 
 The v0.8.0 source archives accidentally repeated the Tool Registry and Health
-Timeline panel names in two dashboard arrays.  Mainsail therefore inserted many
+Timeline panel names in two dashboard arrays. Mainsail therefore inserted many
 copies of those cards and its settings screen could not persist a useful hidden
-state.  This script repairs both supported source archives, adds a getter-level
+state. This script repairs both supported source archives, adds a getter-level
 self-heal for already-saved layouts, and updates release metadata to 0.8.1.
 """
 
@@ -25,16 +25,10 @@ SOURCE_ARCHIVES = (
     ROOT / "source" / "mainsail-v2.18.2-klippertools-source.zip",
 )
 TARGET_PANEL_RE = re.compile(r"^(?P<indent>\s*)'(?P<name>tool-registry|health-timeline)',\s*$")
-OLD_RETURN = "            return panels.filter((element) => allPossiblePanels.includes(element.name))"
-NEW_RETURN = """            // v0.8.1 self-heal: old v0.8.0 layouts may contain duplicate
-            // Klippertools panel entries. Keep the first saved visibility/order entry
-            // for each panel so Dashboard and Interface Settings become usable again.
-            const seenPanelNames = new Set<string>()
-            return panels.filter((element) => {
-                if (!allPossiblePanels.includes(element.name) || seenPanelNames.has(element.name)) return false
-                seenPanelNames.add(element.name)
-                return true
-            })"""
+RETURN_RE = re.compile(
+    r"(?m)^(?P<indent>\s*)return panels\.filter\(\(element(?P<any_type>:\s*any)?\)\s*=>\s*"
+    r"allPossiblePanels\.includes\(element\.name\)\)\s*;?\s*$"
+)
 
 
 def replace_required(path: Path, old: str, new: str) -> None:
@@ -67,16 +61,38 @@ def collapse_target_runs(text: str) -> tuple[str, int]:
     return "".join(output), removed
 
 
+def add_self_heal(text: str, archive: Path) -> str:
+    if "v0.8.1 self-heal" in text:
+        return text
+
+    matches = list(RETURN_RE.finditer(text))
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"{archive}: expected one compatible dashboard return statement, found {len(matches)}"
+        )
+
+    match = matches[0]
+    indent = match.group("indent")
+    element = "element: any" if match.group("any_type") else "element"
+    replacement = f"""{indent}// v0.8.1 self-heal: old v0.8.0 layouts may contain duplicate
+{indent}// Klippertools panel entries. Keep the first saved visibility/order entry
+{indent}// for each panel so Dashboard and Interface Settings become usable again.
+{indent}const seenPanelNames = new Set<string>()
+{indent}return panels.filter(({element}) => {{
+{indent}    if (!allPossiblePanels.includes(element.name) || seenPanelNames.has(element.name)) return false
+{indent}    seenPanelNames.add(element.name)
+{indent}    return true
+{indent}}})"""
+    return text[: match.start()] + replacement + text[match.end() :]
+
+
 def repair_getters(data: bytes, archive: Path) -> bytes:
     text = data.decode("utf-8")
     text, removed = collapse_target_runs(text)
     if removed < 2 and "v0.8.1 self-heal" not in text:
         raise RuntimeError(f"{archive}: duplicate dashboard panel run was not found")
 
-    if "v0.8.1 self-heal" not in text:
-        if text.count(OLD_RETURN) != 1:
-            raise RuntimeError(f"{archive}: expected one dashboard return statement")
-        text = text.replace(OLD_RETURN, NEW_RETURN, 1)
+    text = add_self_heal(text, archive)
 
     standalone = [
         match.group("name")
@@ -126,14 +142,25 @@ def update_release_metadata() -> None:
     manifest["released"] = "2026-08-02"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
-    replace_required(ROOT / "scripts" / "lifecycle.py", f'VERSION = "{OLD_VERSION}"', f'VERSION = "{NEW_VERSION}"')
-    replace_required(ROOT / "tests" / "test_release_metadata.py", f'EXPECTED_VERSION = "{OLD_VERSION}"', f'EXPECTED_VERSION = "{NEW_VERSION}"')
+    replace_required(
+        ROOT / "scripts" / "lifecycle.py",
+        f'VERSION = "{OLD_VERSION}"',
+        f'VERSION = "{NEW_VERSION}"',
+    )
+    replace_required(
+        ROOT / "tests" / "test_release_metadata.py",
+        f'EXPECTED_VERSION = "{OLD_VERSION}"',
+        f'EXPECTED_VERSION = "{NEW_VERSION}"',
+    )
 
     for path in sorted((ROOT / "klipper").glob("*.py")):
         text = path.read_text(encoding="utf-8")
         old = f'PLUGIN_VERSION = "{OLD_VERSION}"'
         if old in text:
-            path.write_text(text.replace(old, f'PLUGIN_VERSION = "{NEW_VERSION}"'), encoding="utf-8")
+            path.write_text(
+                text.replace(old, f'PLUGIN_VERSION = "{NEW_VERSION}"'),
+                encoding="utf-8",
+            )
 
     for relative in (
         "README.md",
