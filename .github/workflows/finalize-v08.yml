@@ -1,0 +1,79 @@
+name: Finalize cumulative v0.8
+
+on:
+  push:
+    branches:
+      - agent/calibration-center-v0.5.0
+    paths:
+      - 'build/v08-source-overlay.part*'
+      - '.github/workflows/finalize-v08.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: klippertools-v08-finalize
+  cancel-in-progress: true
+
+jobs:
+  finalize:
+    if: github.event.head_commit.message == 'build: launch cumulative v0.8 finalizer'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/calibration-center-v0.5.0
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Verify, build, validate, package, and publish
+        shell: bash
+        env:
+          KLIPPERTOOLS_BUILD_WORK: ${{ runner.temp }}/mainsail-build-work
+        run: |
+          set -Eeuo pipefail
+          log="$RUNNER_TEMP/finalize-v08.log"
+          report_failure() {
+            status=$?
+            set +e
+            if [[ "$status" -ne 0 ]]; then
+              mkdir -p build
+              {
+                echo '# Cumulative v0.8 finalizer failure'
+                echo
+                echo "Run: $GITHUB_RUN_ID"
+                echo "Commit: $GITHUB_SHA"
+                echo
+                echo '```text'
+                tail -n 400 "$log"
+                echo '```'
+              } > build/finalize-v08-failure.md
+              git config user.name 'Klippertools Release Bot'
+              git config user.email 'actions@users.noreply.github.com'
+              git add build/finalize-v08-failure.md
+              git commit -m 'ci: record cumulative v0.8 finalizer failure'
+              git push origin HEAD:agent/calibration-center-v0.5.0
+            fi
+            exit "$status"
+          }
+          trap report_failure EXIT
+          exec > >(tee "$log") 2>&1
+
+          git config user.name 'Klippertools Release Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git commit --allow-empty -m 'ci: cumulative v0.8 finalizer started'
+          git push origin HEAD:agent/calibration-center-v0.5.0
+
+          cat build/v08-source-overlay.part* | base64 --decode > "$RUNNER_TEMP/v08-source-overlay.tar.xz"
+          echo 'a8b3d23802ddecf164553f17cef934fee063600a9aa24e414854b13affd021dc  '"$RUNNER_TEMP/v08-source-overlay.tar.xz" | sha256sum -c -
+          if tar -tJf "$RUNNER_TEMP/v08-source-overlay.tar.xz" | grep -Eq '(^/|(^|/)\.\.(/|$))'; then
+            echo 'Unsafe archive path detected' >&2
+            exit 1
+          fi
+          tar -xJf "$RUNNER_TEMP/v08-source-overlay.tar.xz"
+          chmod +x build/finalize-v08.sh
+          build/finalize-v08.sh
+          trap - EXIT

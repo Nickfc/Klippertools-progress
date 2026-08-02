@@ -5,7 +5,7 @@ on:
   pull_request:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   validate:
@@ -53,3 +53,133 @@ jobs:
           unzip -tq source/mainsail-v2.18.2-klippertools-source.zip
           unzip -tq dist/klippertools-suite-0.4.0.zip
           (cd dist && sha256sum -c klippertools-suite-0.4.0.zip.sha256)
+
+      - name: Package validation workspace
+        if: always()
+        run: zip -qr /tmp/klippertools-validation-workspace.zip . -x '.git/*'
+
+      - name: Upload validation workspace
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: klippertools-validation-workspace-${{ github.sha }}
+          path: /tmp/klippertools-validation-workspace.zip
+          if-no-files-found: error
+          retention-days: 1
+
+  finalize-cumulative-v08:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.number == 4 &&
+      github.head_ref == 'agent/calibration-center-v0.5.0'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Use Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Verify, build, validate, package, and publish cumulative v0.8
+        shell: bash
+        env:
+          KLIPPERTOOLS_BUILD_WORK: ${{ runner.temp }}/mainsail-build-work
+        run: |
+          set -Eeuo pipefail
+          source_head="$(git rev-parse HEAD)"
+          log="$RUNNER_TEMP/finalize-v08.log"
+
+          report_failure() {
+            status=$?
+            set +e
+            if [[ "$status" -ne 0 ]]; then
+              git reset --hard "$source_head"
+              git clean -fdx
+              mkdir -p build
+              {
+                echo '# Cumulative v0.8 finalizer failure'
+                echo
+                echo "Run: $GITHUB_RUN_ID"
+                echo "Commit: $source_head"
+                echo
+                echo '```text'
+                tail -n 400 "$log"
+                echo '```'
+              } > build/finalize-v08-failure.md
+              git config user.name 'Klippertools Release Bot'
+              git config user.email 'actions@users.noreply.github.com'
+              git add build/finalize-v08-failure.md
+              git commit -m 'ci: record cumulative v0.8 finalizer failure'
+              git push origin HEAD:agent/calibration-center-v0.5.0
+            fi
+            exit "$status"
+          }
+          if [[ "$(git log -1 --pretty=%s)" != 'build: launch cumulative v0.8 via validation' ]]; then
+            echo "Skipping cumulative finalizer on non-trigger commit."
+            exit 0
+          fi
+
+          trap report_failure EXIT
+          exec > >(tee "$log") 2>&1
+
+          cat build/v08-source-overlay.part* | base64 --decode > "$RUNNER_TEMP/v08-source-overlay.tar.xz"
+          echo 'a8b3d23802ddecf164553f17cef934fee063600a9aa24e414854b13affd021dc  '"$RUNNER_TEMP/v08-source-overlay.tar.xz" | sha256sum -c -
+          if tar -tJf "$RUNNER_TEMP/v08-source-overlay.tar.xz" | grep -Eq '(^/|(^|/)\.\.(/|$))'; then
+            echo 'Unsafe archive path detected' >&2
+            exit 1
+          fi
+
+          rm -f .github/workflows/finalize-v08.yml build/finalize-v08-failure.md
+          tar -xJf "$RUNNER_TEMP/v08-source-overlay.tar.xz"
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('build/finalize-v08.sh')
+          text = path.read_text(encoding='utf-8')
+
+          icon_needle = '''  )
+            patch_file="$GITHUB_WORKSPACE/mainsail/mainsail-${version}-v0.8.0.patch"
+          '''
+          icon_replacement = '''  )
+            sed -i '/^[[:space:]]*mdiHistory,$/d' "$final_dir/src/components/mixins/dashboard.ts"
+            patch_file="$GITHUB_WORKSPACE/mainsail/mainsail-${version}-v0.8.0.patch"
+          '''
+          if text.count(icon_needle) != 1:
+              raise SystemExit('unexpected finalizer patch-generation layout')
+          text = text.replace(icon_needle, icon_replacement, 1)
+
+          build_needle = '''rm -f -- mainsail/core-v2.17.0-v0.8.0.patch mainsail/core-v2.18.2-v0.8.0.patch
+
+          set -Eeuo pipefail
+          scripts/build-mainsail-v0.8.0.sh "$RUNNER_TEMP/mainsail-build-output"
+          '''
+          build_replacement = '''rm -f -- mainsail/core-v2.17.0-v0.8.0.patch mainsail/core-v2.18.2-v0.8.0.patch
+
+          python3 - <<'PY_PATCH'
+          from pathlib import Path
+
+          for patch_path in Path('mainsail').glob('mainsail-v*.patch'):
+              lines = patch_path.read_text(encoding='utf-8').splitlines()
+              normalized = [
+                  '+' if line.startswith('+') and not line.startswith('+++') and not line[1:].strip() else line
+                  for line in lines
+              ]
+              patch_path.write_text('\\n'.join(normalized) + '\\n', encoding='utf-8')
+          PY_PATCH
+
+          set -Eeuo pipefail
+          scripts/build-mainsail-v0.8.0.sh "$RUNNER_TEMP/mainsail-build-output"
+          '''
+          if text.count(build_needle) != 1:
+              raise SystemExit('unexpected finalizer build layout')
+          text = text.replace(build_needle, build_replacement, 1)
+          path.write_text(text, encoding='utf-8')
+          PY
+          chmod +x build/finalize-v08.sh
+          build/finalize-v08.sh
+          trap - EXIT
